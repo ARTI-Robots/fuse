@@ -102,6 +102,12 @@ struct Odometry2DParams : public ParameterBase
       pose_loss = fuse_core::loadLossConfig(nh, "pose_loss");
       linear_velocity_loss = fuse_core::loadLossConfig(nh, "linear_velocity_loss");
       angular_velocity_loss = fuse_core::loadLossConfig(nh, "angular_velocity_loss");
+
+      pose_default_covariance =
+            fuse_core::getCovarianceDiagonalParam<6>(nh, "pose_default_covariance_diagonal", 0.1);
+      
+      twist_default_covariance =
+            fuse_core::getCovarianceDiagonalParam<6>(nh, "twist_default_covariance_diagonal", 0.1);
     }
 
     bool differential { false };
@@ -130,6 +136,8 @@ struct Odometry2DParams : public ParameterBase
     fuse_core::Loss::SharedPtr pose_loss;
     fuse_core::Loss::SharedPtr linear_velocity_loss;
     fuse_core::Loss::SharedPtr angular_velocity_loss;
+    fuse_core::Matrix6d pose_default_covariance; //!< Default pose covariance if the input pose covariance is exactly zero
+    fuse_core::Matrix6d twist_default_covariance; //!< Default twist covariance if the input twist covariance is exactly zero
 };
 
 }  // namespace parameters
