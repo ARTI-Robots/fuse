@@ -34,6 +34,8 @@ add_library(${PROJECT_NAME}
   src/acceleration_angular_3d_stamped.cpp
   src/acceleration_linear_2d_stamped.cpp
   src/acceleration_linear_3d_stamped.cpp
+  src/pinhole_camera.cpp
+  src/pinhole_camera_fixed.cpp
   src/orientation_2d_stamped.cpp
   src/orientation_3d_stamped.cpp
   src/point_2d_fixed_landmark.cpp
@@ -63,7 +65,7 @@ target_link_libraries(${PROJECT_NAME}
 )
 set_target_properties(${PROJECT_NAME}
   PROPERTIES
-    CXX_STANDARD 14
+    CXX_STANDARD 17
     CXX_STANDARD_REQUIRED YES
 )
 
@@ -120,7 +122,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_acceleration_angular_2d_stamped
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -144,7 +146,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_acceleration_angular_3d_stamped
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -168,7 +170,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_acceleration_linear_2d_stamped
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -192,8 +194,56 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_acceleration_linear_3d_stamped
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
+  )
+
+  # Camera Intrinsics tests
+  catkin_add_gtest(test_pinhole_camera
+    test/test_pinhole_camera.cpp
+  )
+  add_dependencies(test_pinhole_camera
+    ${catkin_EXPORTED_TARGETS}
+  )
+  target_include_directories(test_pinhole_camera
+    PRIVATE
+      include
+      ${catkin_INCLUDE_DIRS}
+      ${CERES_INCLUDE_DIRS}
+  )
+  target_link_libraries(test_pinhole_camera
+    ${PROJECT_NAME}
+    ${catkin_LIBRARIES}
+    ${CERES_LIBRARIES}
+  )
+  set_target_properties(test_pinhole_camera
+    PROPERTIES
+      CXX_STANDARD 17
+      CXX_STANDARD_REQUIRED YES
+  )
+
+  # Camera Intrinsics tests
+  catkin_add_gtest(test_pinhole_camera_fixed
+  test/test_pinhole_camera_fixed.cpp
+  )
+  add_dependencies(test_pinhole_camera_fixed
+  ${catkin_EXPORTED_TARGETS}
+  )
+  target_include_directories(test_pinhole_camera_fixed
+  PRIVATE
+    include
+    ${catkin_INCLUDE_DIRS}
+    ${CERES_INCLUDE_DIRS}
+  )
+  target_link_libraries(test_pinhole_camera_fixed
+  ${PROJECT_NAME}
+  ${catkin_LIBRARIES}
+  ${CERES_LIBRARIES}
+  )
+  set_target_properties(test_pinhole_camera_fixed
+  PROPERTIES
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED YES
   )
 
   # Fixed Size Variable Tests
@@ -215,7 +265,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_fixed_size_variable
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -239,7 +289,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_load_device_id
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -263,7 +313,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_orientation_2d_stamped
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -287,7 +337,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_orientation_3d_stamped
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -311,7 +361,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_point_2d_fixed_landmark
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -335,7 +385,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_point_2d_landmark
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -359,7 +409,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_point_3d_fixed_landmark
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -383,7 +433,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_point_3d_landmark
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -407,7 +457,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_position_2d_stamped
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -431,7 +481,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_position_3d_stamped
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -455,7 +505,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_velocity_angular_2d_stamped
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -479,7 +529,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_velocity_angular_3d_stamped
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -503,7 +553,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_velocity_linear_2d_stamped
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -527,7 +577,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_velocity_linear_3d_stamped
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 endif()

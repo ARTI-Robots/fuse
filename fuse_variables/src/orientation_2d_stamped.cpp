@@ -37,7 +37,7 @@
 #include <fuse_core/uuid.h>
 #include <fuse_variables/fixed_size_variable.h>
 #include <fuse_variables/stamped.h>
-#include <pluginlib/class_list_macros.h>
+#include <pluginlib/class_list_macros.hpp>
 #include <ros/time.h>
 
 #include <boost/serialization/export.hpp>
@@ -62,7 +62,7 @@ void Orientation2DStamped::print(std::ostream& stream) const
          << "  device_id: " << deviceId() << "\n"
          << "  size: " << size() << "\n"
          << "  data:\n"
-         << "  - yaw: " << yaw() << "\n";
+         << "  - yaw: " << getYaw() << "\n";
 }
 
 fuse_core::LocalParameterization* Orientation2DStamped::localParameterization() const
