@@ -55,7 +55,7 @@ namespace fuse_constraints
  *
  * So, for example, if
  * b_ = [ measured_yaw  ]
- *      [ meausred_roll ]
+ *      [ measured_roll ]
  *
  * then the cost function is of the form:
  *
@@ -140,7 +140,7 @@ public:
 
 private:
   fuse_core::MatrixXd A_;  //!< The residual weighting matrix, most likely the square root information matrix
-  fuse_core::VectorXd b_;  //!< The measured 3D orientation (quaternion) value
+  fuse_core::VectorXd b_;  //!< The orientation measurement or prior. Its order must match the values in \p axes.
   std::vector<Euler> axes_;  //!< The Euler angle axes that we're measuring
 };
 

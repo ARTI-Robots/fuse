@@ -11,6 +11,18 @@
     the 2D linear acceleration.
     </description>
   </class>
+  <class type="fuse_constraints::AbsoluteAccelerationAngular3DStampedConstraint" base_class_type="fuse_core::Constraint">
+    <description>
+    A constraint that represents either prior information about a 3D angular acceleration, or a direct measurement of
+    the 3D angular acceleration.
+    </description>
+  </class>
+  <class type="fuse_constraints::AbsoluteAccelerationLinear3DStampedConstraint" base_class_type="fuse_core::Constraint">
+    <description>
+    A constraint that represents either prior information about a 3D linear acceleration, or a direct measurement of
+    the 3D linear acceleration.
+    </description>
+  </class>
   <class type="fuse_constraints::AbsoluteOrientation2DStampedConstraint" base_class_type="fuse_core::Constraint">
     <description>
     A constraint that represents either prior information about a 2D orientation, or a direct measurement of the
@@ -41,6 +53,18 @@
     the 2D linear velocity.
     </description>
   </class>
+  <class type="fuse_constraints::AbsoluteVelocityAngular3DStampedConstraint" base_class_type="fuse_core::Constraint">
+    <description>
+    A constraint that represents either prior information about a 3D angular velocity, or a direct measurement of
+    the 3D angular velocity.
+    </description>
+  </class>
+  <class type="fuse_constraints::AbsoluteVelocityLinear3DStampedConstraint" base_class_type="fuse_core::Constraint">
+    <description>
+    A constraint that represents either prior information about a 3D linear velocity, or a direct measurement of
+    the 3D linear velocity.
+    </description>
+  </class>
   <class type="fuse_constraints::AbsoluteOrientation3DStampedConstraint" base_class_type="fuse_core::Constraint">
     <description>
     A constraint that represents either prior information about a 3D orientation, or a direct measurement of the
@@ -61,6 +85,12 @@
   <class type="fuse_constraints::AbsolutePose3DStampedConstraint" base_class_type="fuse_core::Constraint">
     <description>
     A constraint that represents either prior information about a 3D pose, or a direct measurement of the 3D pose.
+    </description>
+  </class>
+  <class type="fuse_constraints::AbsolutePose3DStampedEulerConstraint" base_class_type="fuse_core::Constraint">
+    <description>
+    A constraint that represents either prior information about a 3D pose, or a direct measurement of the 3D pose,
+    with the 3D orientation as roll-pitch-yaw Euler angles.
     </description>
   </class>
   <class type="fuse_constraints::MarginalConstraint" base_class_type="fuse_core::Constraint">

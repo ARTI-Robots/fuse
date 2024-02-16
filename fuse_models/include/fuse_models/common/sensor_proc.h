@@ -1220,6 +1220,46 @@ inline void scaleProcessNoiseCovariance(fuse_core::Matrix8d& process_noise_covar
       velocity * process_noise_covariance.topLeftCorner<3, 3>() * velocity.transpose();
 }
 
+/**
+ * @brief Scales the process noise covariance pose by the norm of the velocity
+ *
+ * @param[in, out] process_noise_covariance - The process noise covariance to scale. Only the pose components (x, y,
+ *                                            z, roll, pitch, yaw) are scaled, and they are assumed to be in the top
+ *                                            left 6x6 corner
+ * @param[in] velocity_linear - The linear velocity
+ * @param[in] velocity_angular - The angular velocity
+ * @param[in] velocity_norm_min - The minimum velocity norm
+ */
+inline void scaleProcessNoiseCovariance(fuse_core::Matrix15d& process_noise_covariance,
+                                        const tf2::Vector3& velocity_linear, const tf2::Vector3& velocity_angular,
+                                        const double velocity_norm_min)
+{
+  // A more principled approach would be to get the current velocity from the state, make a diagonal matrix from it,
+  // and then rotate it to be in the world frame (i.e., the same frame as the pose data). We could then use this
+  // rotated velocity matrix to scale the process noise covariance for the pose variables as
+  // rotatedVelocityMatrix * poseCovariance * rotatedVelocityMatrix'
+  // However, this presents trouble for robots that may incur rotational error as a result of linear motion (and
+  // vice-versa). Instead, we create a diagonal matrix whose diagonal values are the vector norm of the state's
+  // velocity. We use that to scale the process noise covariance.
+  //
+  // The comment above has been taken from:
+  // https://github.com/cra-ros-pkg/robot_localization/blob/melodic-devel/src/filter_base.cpp#L138-L144
+  //
+  // We also need to make sure the norm is not zero, because otherwise the resulting process noise covariance for the
+  // pose becomes zero and we get NaN when we compute the inverse to obtain the information
+  fuse_core::Matrix6d velocity;
+  velocity.setIdentity();
+
+  fuse_core::Vector6d velocity_values;
+  velocity_values << velocity_linear.x(), velocity_linear.y(), velocity_linear.z(),
+                     velocity_angular.x(), velocity_angular.y(), velocity_angular.z();
+
+  velocity.diagonal() *= std::max(velocity_norm_min, velocity_values.norm());
+
+  process_noise_covariance.topLeftCorner<6, 6>() =
+      velocity * process_noise_covariance.topLeftCorner<6, 6>() * velocity.transpose();
+}
+
 }  // namespace common
 
 }  // namespace fuse_models

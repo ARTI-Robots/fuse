@@ -55,6 +55,16 @@ using Vector6d = Eigen::Matrix<double, 6, 1>;
 using Vector7d = Eigen::Matrix<double, 7, 1>;
 using Vector8d = Eigen::Matrix<double, 8, 1>;
 using Vector9d = Eigen::Matrix<double, 9, 1>;
+using Vector10d = Eigen::Matrix<double, 10, 1>;
+using Vector11d = Eigen::Matrix<double, 11, 1>;
+using Vector12d = Eigen::Matrix<double, 12, 1>;
+using Vector13d = Eigen::Matrix<double, 13, 1>;
+using Vector14d = Eigen::Matrix<double, 14, 1>;
+using Vector15d = Eigen::Matrix<double, 15, 1>;
+using Vector16d = Eigen::Matrix<double, 16, 1>;
+using Vector17d = Eigen::Matrix<double, 17, 1>;
+using Vector18d = Eigen::Matrix<double, 18, 1>;
+using Vector19d = Eigen::Matrix<double, 19, 1>;
 
 using MatrixXd = Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 using Matrix1d = Eigen::Matrix<double, 1, 1, Eigen::RowMajor>;
@@ -66,6 +76,16 @@ using Matrix6d = Eigen::Matrix<double, 6, 6, Eigen::RowMajor>;
 using Matrix7d = Eigen::Matrix<double, 7, 7, Eigen::RowMajor>;
 using Matrix8d = Eigen::Matrix<double, 8, 8, Eigen::RowMajor>;
 using Matrix9d = Eigen::Matrix<double, 9, 9, Eigen::RowMajor>;
+using Matrix10d = Eigen::Matrix<double, 10, 10, Eigen::RowMajor>;
+using Matrix11d = Eigen::Matrix<double, 11, 11, Eigen::RowMajor>;
+using Matrix12d = Eigen::Matrix<double, 12, 12, Eigen::RowMajor>;
+using Matrix13d = Eigen::Matrix<double, 13, 13, Eigen::RowMajor>;
+using Matrix14d = Eigen::Matrix<double, 14, 14, Eigen::RowMajor>;
+using Matrix15d = Eigen::Matrix<double, 15, 15, Eigen::RowMajor>;
+using Matrix16d = Eigen::Matrix<double, 16, 16, Eigen::RowMajor>;
+using Matrix17d = Eigen::Matrix<double, 17, 17, Eigen::RowMajor>;
+using Matrix18d = Eigen::Matrix<double, 18, 18, Eigen::RowMajor>;
+using Matrix19d = Eigen::Matrix<double, 19, 19, Eigen::RowMajor>;
 
 template <typename Scalar, int RowsAtCompileTime, int ColsAtCompileTime>
 using Matrix = Eigen::Matrix<Scalar, RowsAtCompileTime, ColsAtCompileTime, Eigen::RowMajor>;

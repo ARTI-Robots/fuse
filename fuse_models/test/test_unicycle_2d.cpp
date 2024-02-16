@@ -326,7 +326,7 @@ TEST(Unicycle2D, generateMotionModel)
   auto linear_acceleration1 = fuse_variables::AccelerationLinear2DStamped::make_shared(ros::Time(1, 0));
   position1->x() = 1.1;
   position1->y() = 2.1;
-  yaw1->yaw() = 1.2;
+  yaw1->setYaw(1.2);
   linear_velocity1->x() = 1.0;
   linear_velocity1->y() = 0.0;
   yaw_velocity1->yaw() = 0.0;
@@ -345,7 +345,7 @@ TEST(Unicycle2D, generateMotionModel)
       linear_velocity1->uuid(),
       yaw_velocity1->uuid(),
       linear_acceleration1->uuid(),
-      tf2_2d::Transform(position1->x(), position1->y(), yaw1->yaw()),
+      tf2_2d::Transform(position1->x(), position1->y(), yaw1->getYaw()),
       tf2_2d::Vector2(linear_velocity1->x(), linear_velocity1->y()),
       yaw_velocity1->yaw(),
       tf2_2d::Vector2(linear_acceleration1->x(), linear_acceleration1->y())});  // NOLINT(whitespace/braces)
@@ -380,14 +380,14 @@ TEST(Unicycle2D, generateMotionModel)
     auto velocity_yaw = std::static_pointer_cast<fuse_variables::VelocityAngular2DStamped>(variables.at(3));
     auto acceleration_linear = std::static_pointer_cast<fuse_variables::AccelerationLinear2DStamped>(variables.at(4));
 
-    auto expected_pose = tf2_2d::Transform(position1->x(), position1->y(), yaw1->yaw());
+    auto expected_pose = tf2_2d::Transform(position1->x(), position1->y(), yaw1->getYaw());
     auto expected_linear_velocity = tf2_2d::Vector2(linear_velocity1->x(), linear_velocity1->y());
     auto expected_yaw_velocity = yaw_velocity1->yaw();
     auto expected_linear_acceleration = tf2_2d::Vector2(linear_acceleration1->x(), linear_acceleration1->y());
 
     EXPECT_EQ(position->x(), expected_pose.x());
     EXPECT_EQ(position->y(), expected_pose.y());
-    EXPECT_EQ(orientation->yaw(), expected_pose.yaw());
+    EXPECT_EQ(orientation->getYaw(), expected_pose.getYaw());
 
     EXPECT_EQ(velocity_linear->x(), expected_linear_velocity.x());
     EXPECT_EQ(velocity_linear->y(), expected_linear_velocity.y());
@@ -414,7 +414,7 @@ TEST(Unicycle2D, generateMotionModel)
 
     EXPECT_NEAR(position->x(), expected_pose.x(), 1.0e-9);
     EXPECT_NEAR(position->y(), expected_pose.y(), 1.0e-9);
-    EXPECT_NEAR(orientation->yaw(), expected_pose.yaw(), 1.0e-9);
+    EXPECT_NEAR(orientation->getYaw(), expected_pose.getYaw(), 1.0e-9);
 
     EXPECT_NEAR(velocity_linear->x(), expected_linear_velocity.x(), 1.0e-9);
     EXPECT_NEAR(velocity_linear->y(), expected_linear_velocity.y(), 1.0e-9);

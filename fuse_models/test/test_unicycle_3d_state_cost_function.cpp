@@ -31,14 +31,15 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_models/unicycle_2d_state_cost_function.h>
-#include <fuse_models/unicycle_2d_state_cost_functor.h>
+#include <fuse_models/unicycle_3d_state_cost_function.h>
+#include <fuse_models/unicycle_3d_state_cost_functor.h>
 
 #include <gtest/gtest.h>
 #include <fuse_core/eigen_gtest.h>
 
 #include <ceres/autodiff_cost_function.h>
 #include <ceres/gradient_checker.h>
+#include <ceres/rotation.h>
 #include <Eigen/Dense>
 
 #include <limits>
@@ -48,34 +49,41 @@
 TEST(CostFunction, evaluateCostFunction)
 {
   // Create cost function
-  const double process_noise_diagonal[] = { 1e-3, 1e-3, 1e-2, 1e-6, 1e-6, 1e-4, 1e-9, 1e-9 };
-  const fuse_core::Matrix8d covariance = fuse_core::Vector8d(process_noise_diagonal).asDiagonal();
+  const double process_noise_diagonal[] = { 1e-3,  2e-3,  3e-3,  // NOLINT(whitespace/braces)
+                                            4e-3,  5e-3,  6e-3,
+                                            7e-3,  8e-3,  9e-3,
+                                            10e-3, 11e-3, 12e-3,
+                                            13e-3, 14e-3, 15e-3 };  // NOLINT(whitespace/braces)
+  const fuse_core::Matrix15d covariance = fuse_core::Vector15d(process_noise_diagonal).asDiagonal();
 
   const double dt{ 0.1 };
-  const fuse_core::Matrix8d sqrt_information{ covariance.inverse().llt().matrixU() };
+  const fuse_core::Matrix15d sqrt_information{ covariance.inverse().llt().matrixU() };
 
-  const fuse_models::Unicycle2DStateCostFunction cost_function{ dt, sqrt_information };
+  const fuse_models::Unicycle3DStateCostFunction cost_function{ dt, sqrt_information };
 
   // Evaluate cost function
-  const double position1[] = {0.0, 0.0};
-  const double yaw1[] = {0.0};
-  const double vel_linear1[] = {1.0, 0.0};
-  const double vel_yaw1[] = {1.570796327};
-  const double acc_linear1[] = {1.0, 0.0};
+  const double position1[3] = {1.0, 2.0, 3.0};
+  const double orientation1[4] = {1.0, 0.0, 0.0, 0.0};
+  const double vel_linear1[3] = {1.0, 2.0, 3.0};
+  const double vel_angular1[3] = {1.570796327, 2.570796327, 3.570796327};
+  const double acc_linear1[3] = {1.0, 2.0, 3.0};
 
-  const double position2[] = {0.105, 0.0};
-  const double yaw2[] = {0.1570796327};
-  const double vel_linear2[] = {1.1, 0.0};
-  const double vel_yaw2[] = {1.570796327};
-  const double acc_linear2[] = {1.0, 0.0};
+  const double position2[3] = {1.105, 2.21, 3.315};
+  Eigen::Quaterniond q2 = Eigen::AngleAxisd(0.3570796327, Eigen::Vector3d::UnitZ()) *
+                          Eigen::AngleAxisd(0.2570796327, Eigen::Vector3d::UnitY()) *
+                          Eigen::AngleAxisd(0.1570796327, Eigen::Vector3d::UnitX());
+  const double orientation2[4] = {q2.w(), q2.x(), q2.y(), q2.z()};
+  const double vel_linear2[3] = {1.1, 2.2, 3.3};
+  const double vel_angular2[3] = {1.570796327, 2.570796327, 3.570796327};
+  const double acc_linear2[3] = {1.0, 2.0, 3.0};
 
   const double* parameters[] =
   {
-    position1, yaw1, vel_linear1, vel_yaw1, acc_linear1,
-    position2, yaw2, vel_linear2, vel_yaw2, acc_linear2
+    position1, orientation1, vel_linear1, vel_angular1, acc_linear1,
+    position2, orientation2, vel_linear2, vel_angular2, acc_linear2
   };
 
-  fuse_core::Vector8d residuals;
+  fuse_core::Vector15d residuals;
 
   const auto& block_sizes = cost_function.parameter_block_sizes();
   const auto num_parameter_blocks = block_sizes.size();
@@ -94,8 +102,8 @@ TEST(CostFunction, evaluateCostFunction)
   EXPECT_TRUE(cost_function.Evaluate(parameters, residuals.data(), jacobians.data()));
 
   // We cannot use std::numeric_limits<double>::epsilon() tolerance because with the expected state2 above the residuals
-  // are not zero for position2.x = -4.389e-16 and yaw2 = -2.776e-16
-  EXPECT_MATRIX_NEAR(fuse_core::Vector8d::Zero(), residuals, 1e-15);
+  // are not zero
+  EXPECT_MATRIX_NEAR(fuse_core::Vector15d::Zero(), residuals, 1e-15);
 
   // Check jacobians are correct using a gradient checker
   ceres::NumericDiffOptions numeric_diff_options;
@@ -106,10 +114,11 @@ TEST(CostFunction, evaluateCostFunction)
   EXPECT_TRUE(gradient_checker.Probe(parameters, 1e-9, &probe_results)) << probe_results.error_log;
 
   // Create cost function using automatic differentiation on the cost functor
-  ceres::AutoDiffCostFunction<fuse_models::Unicycle2DStateCostFunctor, 8, 2, 1, 2, 1, 2, 2, 1, 2, 1, 2>
-      cost_function_autodiff(new fuse_models::Unicycle2DStateCostFunctor(dt, sqrt_information));
+  ceres::AutoDiffCostFunction<fuse_models::Unicycle3DStateCostFunctor, 15, 3, 4, 3, 3, 3, 3, 4, 3, 3, 3>
+      cost_function_autodiff(new fuse_models::Unicycle3DStateCostFunctor(dt, sqrt_information));
 
   // Evaluate cost function that uses automatic differentiation
+  fuse_core::Vector15d residuals_autodiff;
   std::vector<fuse_core::MatrixXd> J_autodiff(num_parameter_blocks);
   std::vector<double*> jacobians_autodiff(num_parameter_blocks);
 
@@ -119,14 +128,18 @@ TEST(CostFunction, evaluateCostFunction)
     jacobians_autodiff[i] = J_autodiff[i].data();
   }
 
-  EXPECT_TRUE(cost_function_autodiff.Evaluate(parameters, residuals.data(), jacobians_autodiff.data()));
+  EXPECT_TRUE(cost_function_autodiff.Evaluate(parameters, residuals_autodiff.data(), jacobians_autodiff.data()));
+
+  // We cannot use std::numeric_limits<double>::epsilon() tolerance because with the expected state2 above the residuals
+  // are not zero
+  EXPECT_MATRIX_NEAR(residuals_autodiff, residuals, 1e-15);
 
   const Eigen::IOFormat HeavyFmt(
       Eigen::FullPrecision, 0, ", ", ";\n", "[", "]", "[", "]");
 
   for (size_t i = 0; i < num_parameter_blocks; ++i)
   {
-    EXPECT_MATRIX_NEAR(J_autodiff[i], J[i], std::numeric_limits<double>::epsilon())
+    EXPECT_MATRIX_NEAR(J_autodiff[i], J[i], 1e-12)
       << "Autodiff Jacobian[" << i << "] =\n" << J_autodiff[i].format(HeavyFmt)
       << "\nAnalytic Jacobian[" << i << "] =\n" << J[i].format(HeavyFmt);
   }
