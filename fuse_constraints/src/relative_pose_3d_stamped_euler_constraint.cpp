@@ -31,14 +31,13 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_constraints/absolute_pose_3d_stamped_euler_constraint.h>
+#include <fuse_constraints/relative_pose_3d_stamped_euler_constraint.h>
 
-#include <fuse_constraints/normal_prior_pose_3d_euler_cost_functor.h>
+#include <fuse_constraints/normal_delta_pose_3d_euler_cost_functor.h>
 #include <pluginlib/class_list_macros.hpp>
 
 #include <boost/serialization/export.hpp>
 #include <ceres/autodiff_cost_function.h>
-#include <Eigen/Dense>
 
 #include <string>
 #include <vector>
@@ -47,38 +46,42 @@
 namespace fuse_constraints
 {
 
-AbsolutePose3DStampedEulerConstraint::AbsolutePose3DStampedEulerConstraint(
+RelativePose3DStampedEulerConstraint::RelativePose3DStampedEulerConstraint(
   const std::string& source,
-  const fuse_variables::Position3DStamped& position,
-  const fuse_variables::Orientation3DStamped& orientation,
-  const fuse_core::VectorXd& partial_mean,
+  const fuse_variables::Position3DStamped& position1,
+  const fuse_variables::Orientation3DStamped& orientation1,
+  const fuse_variables::Position3DStamped& position2,
+  const fuse_variables::Orientation3DStamped& orientation2,
+  const fuse_core::VectorXd& partial_delta,
   const fuse_core::MatrixXd& partial_covariance,
   const std::vector<size_t>& linear_indices,
   const std::vector<Euler>& angular_indices) :
-    fuse_core::Constraint(source, {position.uuid(), orientation.uuid()})  // NOLINT(whitespace/braces)
+    fuse_core::Constraint(
+      source,
+      {position1.uuid(), orientation1.uuid(), position2.uuid(), orientation2.uuid()})  // NOLINT(whitespace/braces)
 {
   size_t total_variable_size = 6;  // 3 position (x, y, z) and 3 orientation variables (roll, pitch, yaw)
   size_t total_indices = linear_indices.size() + angular_indices.size();
 
-  assert(partial_mean.rows() == static_cast<int>(total_indices));
+  assert(partial_delta.rows() == static_cast<int>(total_indices));
   assert(partial_covariance.rows() == static_cast<int>(total_indices));
   assert(partial_covariance.cols() == static_cast<int>(total_indices));
 
   // Compute the sqrt information of the provided cov matrix
   fuse_core::MatrixXd partial_sqrt_information = partial_covariance.inverse().llt().matrixU();
 
-  // Assemble a mean vector and sqrt information matrix from the provided values, but in proper Variable order
+  // Assemble a mean vector and sqrt information matrix from the provided values, but in proper variable order
   // What are we doing here?
   // The constraint equation is defined as: cost(x) = ||A * (x - b)||^2
   // If we are measuring a subset of dimensions, we only want to produce costs for the measured dimensions.
   // But the variable vectors will be full sized. We can make this all work out by creating a non-square A
   // matrix, where each row computes a cost for one measured dimensions, and the columns are in the order
   // defined by the variable.
-  mean_ = fuse_core::VectorXd::Zero(total_variable_size);
+  delta_ = fuse_core::Vector6d::Zero();
   sqrt_information_ = fuse_core::MatrixXd::Zero(total_indices, total_variable_size);
   for (size_t i = 0; i < linear_indices.size(); ++i)
   {
-    mean_(linear_indices[i]) = partial_mean(i);
+    delta_(linear_indices[i]) = partial_delta(i);
     sqrt_information_.col(linear_indices[i]) = partial_sqrt_information.col(i);
   }
 
@@ -100,13 +103,13 @@ AbsolutePose3DStampedEulerConstraint::AbsolutePose3DStampedEulerConstraint(
       ROS_FATAL_STREAM("angular index is set different than roll, pitch and yaw which should not be possible");
       return;
     }
-    size_t final_index = position.size() + angular_ordered_index;
-    mean_(final_index) = partial_mean(i);
+    size_t final_index = 3 + angular_ordered_index;
+    delta_(final_index) = partial_delta(i);
     sqrt_information_.col(final_index) = partial_sqrt_information.col(i);
   }
 }
 
-fuse_core::Matrix6d AbsolutePose3DStampedEulerConstraint::covariance() const
+fuse_core::Matrix6d RelativePose3DStampedEulerConstraint::covariance() const
 {
   // We want to compute:
   // cov = (sqrt_info' * sqrt_info)^-1
@@ -120,14 +123,16 @@ fuse_core::Matrix6d AbsolutePose3DStampedEulerConstraint::covariance() const
   return pinv * pinv.transpose();
 }
 
-void AbsolutePose3DStampedEulerConstraint::print(std::ostream& stream) const
+void RelativePose3DStampedEulerConstraint::print(std::ostream& stream) const
 {
   stream << type() << "\n"
          << "  source: " << source() << "\n"
          << "  uuid: " << uuid() << "\n"
-         << "  position variable: " << variables().at(0) << "\n"
-         << "  orientation variable: " << variables().at(1) << "\n"
-         << "  mean: " << mean().transpose() << "\n"
+         << "  position1 variable: " << variables().at(0) << "\n"
+         << "  orientation1 variable: " << variables().at(1) << "\n"
+         << "  position2 variable: " << variables().at(2) << "\n"
+         << "  orientation2 variable: " << variables().at(3) << "\n"
+         << "  delta: " << delta().transpose() << "\n"
          << "  sqrt_info: " << sqrtInformation() << "\n";
 
   if (loss())
@@ -137,15 +142,15 @@ void AbsolutePose3DStampedEulerConstraint::print(std::ostream& stream) const
   }
 }
 
-ceres::CostFunction* AbsolutePose3DStampedEulerConstraint::costFunction() const
+ceres::CostFunction* RelativePose3DStampedEulerConstraint::costFunction() const
 {
   const auto num_residuals = sqrt_information_.rows();
 
-  return new ceres::AutoDiffCostFunction<NormalPriorPose3DEulerCostFunctor, ceres::DYNAMIC, 3, 4>(
-    new NormalPriorPose3DEulerCostFunctor(sqrt_information_, mean_), num_residuals);
+  return new ceres::AutoDiffCostFunction<NormalDeltaPose3DEulerCostFunctor, ceres::DYNAMIC, 3, 4, 3, 4>(
+    new NormalDeltaPose3DEulerCostFunctor(sqrt_information_, delta_), num_residuals);
 }
 
 }  // namespace fuse_constraints
 
-BOOST_CLASS_EXPORT_IMPLEMENT(fuse_constraints::AbsolutePose3DStampedEulerConstraint);
-PLUGINLIB_EXPORT_CLASS(fuse_constraints::AbsolutePose3DStampedEulerConstraint, fuse_core::Constraint);
+BOOST_CLASS_EXPORT_IMPLEMENT(fuse_constraints::RelativePose3DStampedEulerConstraint);
+PLUGINLIB_EXPORT_CLASS(fuse_constraints::RelativePose3DStampedEulerConstraint, fuse_core::Constraint);

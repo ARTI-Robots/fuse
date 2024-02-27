@@ -39,6 +39,11 @@
 #include <fuse_variables/position_2d_stamped.h>
 #include <fuse_variables/velocity_angular_2d_stamped.h>
 #include <fuse_variables/velocity_linear_2d_stamped.h>
+#include <fuse_variables/acceleration_linear_3d_stamped.h>
+#include <fuse_variables/orientation_3d_stamped.h>
+#include <fuse_variables/position_3d_stamped.h>
+#include <fuse_variables/velocity_angular_3d_stamped.h>
+#include <fuse_variables/velocity_linear_3d_stamped.h>
 
 
 namespace fuse_models
@@ -72,6 +77,30 @@ struct is_linear_2d<fuse_variables::Position2DStamped>
 };
 
 template <typename T>
+struct is_linear_3d
+{
+  static const bool value = false;
+};
+
+template<>
+struct is_linear_3d<fuse_variables::AccelerationLinear3DStamped>
+{
+  static const bool value = true;
+};
+
+template<>
+struct is_linear_3d<fuse_variables::VelocityLinear3DStamped>
+{
+  static const bool value = true;
+};
+
+template<>
+struct is_linear_3d<fuse_variables::Position3DStamped>
+{
+  static const bool value = true;
+};
+
+template <typename T>
 struct is_angular_2d
 {
   static const bool value = false;
@@ -85,6 +114,42 @@ struct is_angular_2d<fuse_variables::Orientation2DStamped>
 
 template<>
 struct is_angular_2d<fuse_variables::VelocityAngular2DStamped>
+{
+  static const bool value = true;
+};
+
+template <typename T>
+struct is_angular_3d
+{
+  static const bool value = false;
+};
+
+template<>
+struct is_angular_3d<fuse_variables::Orientation3DStamped>
+{
+  static const bool value = true;
+};
+
+template<>
+struct is_angular_3d<fuse_variables::VelocityAngular3DStamped>
+{
+  static const bool value = true;
+};
+
+template <typename T>
+struct is_orientation
+{
+  static const bool value = false;
+};
+
+template<>
+struct is_orientation<fuse_variables::Orientation2DStamped>
+{
+  static const bool value = true;
+};
+
+template<>
+struct is_orientation<fuse_variables::Orientation3DStamped>
 {
   static const bool value = true;
 };

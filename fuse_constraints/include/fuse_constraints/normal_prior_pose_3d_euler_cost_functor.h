@@ -53,10 +53,11 @@ namespace fuse_constraints
  *
  * The cost function is of the form:
  *
- *   cost(x) = || A * [  p - b(0:2)               ] ||^2
- *             ||     [  AngleAxis(b(3:6)^-1 * q) ] ||
+ *   cost(x) = || A * [  p - b(0:2) ] ||^2
+ *             ||     [  q - b(3:6) ] ||
  *
- * where, the matrix A and the vector b are fixed, p is the position variable, and q is the orientation variable.
+ * Here, the matrix A can be of variable size, thereby permitting the computation of errors for partial measurements.
+ * The vector b is a fixed-size 6x1, p is the position variable, and q is the orientation variable.
  * Note that the covariance submatrix for the quaternion is 3x3, representing errors in the orientation local
  * parameterization tangent space. In case the user is interested in implementing a cost function of the form
  *
@@ -73,11 +74,16 @@ public:
   /**
    * @brief Construct a cost function instance
    *
+   * The residual weighting matrix can vary in size, as this cost functor can be used to compute costs for partial
+   * vectors. The number of rows of A will be the number of dimensions for which you want to compute the error, and the
+   * number of columns in A will be fixed at 6. For example, if we just want to use the values of x and yaw, then \p A
+   * will be of size 2x6.
+   *
    * @param[in] A The residual weighting matrix, most likely the square root information matrix in order
    *              (x, y, z, roll, pitch, yaw)
    * @param[in] b The 3D pose measurement or prior in order (x, y, z, roll, pitch, yaw)
    */
-  NormalPriorPose3DEulerCostFunctor(const fuse_core::Matrix6d& A, const fuse_core::Vector6d& b);
+  NormalPriorPose3DEulerCostFunctor(const fuse_core::MatrixXd& A, const fuse_core::Vector6d& b);
 
   /**
    * @brief Evaluate the cost function. Used by the Ceres optimization engine.
@@ -86,14 +92,14 @@ public:
   bool operator()(const T* const position, const T* const orientation, T* residual) const;
 
 private:
-  fuse_core::Matrix6d A_;
+  fuse_core::MatrixXd A_;
   fuse_core::Vector6d b_;
 
   NormalPriorOrientation3DEulerCostFunctor orientation_functor_;
 };
 
 NormalPriorPose3DEulerCostFunctor::NormalPriorPose3DEulerCostFunctor(
-  const fuse_core::Matrix6d& A, const fuse_core::Vector6d& b)
+  const fuse_core::MatrixXd& A, const fuse_core::Vector6d& b)
   : A_(A),
     b_(b),
     orientation_functor_(fuse_core::Matrix3d::Identity(), b_.tail<3>())  // Delta will not be scaled
@@ -104,18 +110,19 @@ template <typename T>
 bool NormalPriorPose3DEulerCostFunctor::operator()(
   const T* const position, const T* const orientation, T* residual) const
 {
+  Eigen::Matrix<T, 6, 1> full_residuals_vector;
   // Compute the position error
-  residual[0] = position[0] - T(b_(0));
-  residual[1] = position[1] - T(b_(1));
-  residual[2] = position[2] - T(b_(2));
+  full_residuals_vector[0] = position[0] - T(b_(0));
+  full_residuals_vector[1] = position[1] - T(b_(1));
+  full_residuals_vector[2] = position[2] - T(b_(2));
 
   // Use the 3D orientation cost functor to compute the orientation delta
-  orientation_functor_(orientation, &residual[3]);
+  orientation_functor_(orientation, full_residuals_vector.data() + 3);
 
   // Scale the residuals by the square root information matrix to account for
   // the measurement uncertainty.
-  Eigen::Map<Eigen::Matrix<T, 6, 1>> residual_map(residual);
-  residual_map.applyOnTheLeft(A_.template cast<T>());
+  Eigen::Map<Eigen::Matrix<T, Eigen::Dynamic, 1>> residuals_vector(residual, A_.rows());
+  residuals_vector = A_.template cast<T>() * full_residuals_vector;
 
   return true;
 }

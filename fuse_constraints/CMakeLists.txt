@@ -58,6 +58,7 @@ add_library(${PROJECT_NAME}
   src/relative_orientation_3d_stamped_constraint.cpp
   src/relative_pose_2d_stamped_constraint.cpp
   src/relative_pose_3d_stamped_constraint.cpp
+  src/relative_pose_3d_stamped_euler_constraint.cpp
   src/uuid_ordering.cpp
   src/variable_constraints.cpp
 )
