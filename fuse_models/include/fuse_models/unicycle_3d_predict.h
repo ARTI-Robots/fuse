@@ -245,67 +245,51 @@ inline void predict(
   double& acc_linear2_z,
   double** jacobians)
 {
-  // There are better models for this projection, but this matches the one used by r_l.
-  const double sr = ceres::sin(roll1);
-  const double cr = ceres::cos(roll1);
-
-  const double sp = ceres::sin(pitch1);
-  const double cp = ceres::cos(pitch1);
-  const double cpi = 1.0 / cp;
-  const double tp = sp * cpi;
-
-  const double sy = ceres::sin(yaw1);
-  const double cy = ceres::cos(yaw1);
-
-  position2_x = position1_x + vel_linear1_x * cy * cp * dt
-                            + vel_linear1_y * (cy * sp * sr - sy * cr) * dt
-                            + vel_linear1_z * (cy * sp * cr + sy * sr) * dt
-                            + acc_linear1_x * 0.5 * cy * cp * dt * dt
-                            + acc_linear1_y * 0.5 * (cy * sp * sr - sy * cr) * dt * dt
-                            + acc_linear1_z * 0.5 * (cy * sp * cr + sy * sr) * dt * dt;
-
-  position2_y = position1_y + vel_linear1_x * sy * cp * dt
-                            + vel_linear1_y * (sy * sp * sr + cy * cr) * dt
-                            + vel_linear1_z * (sy * sp * cr - cy * sr) * dt
-                            + acc_linear1_x * 0.5 * sy * cp * dt * dt
-                            + acc_linear1_y * 0.5 * (sy * sp * sr + cy * cr) * dt * dt
-                            + acc_linear1_z * 0.5 * (sy * sp * cr - cy * sr) * dt * dt;
-
-  position2_z = position1_z + vel_linear1_x * (-sp) * dt
-                            + vel_linear1_y * cp * sr * dt
-                            + vel_linear1_z * cp * cr * dt
-                            + acc_linear1_x * 0.5 * (-sp) * dt * dt
-                            + acc_linear1_y * 0.5 * cp * sr * dt * dt
-                            + acc_linear1_z * 0.5 * cp * cr * dt * dt;
-
-  roll2 = roll1 + vel_roll1 * dt
-                + vel_pitch1 * sr * tp * dt
-                + vel_yaw1 * cr * tp * dt;
-
-  pitch2 = pitch1 + vel_pitch1 * cr * dt
-                  + vel_yaw1 * (-sr) * dt;
-
-  yaw2 = yaw1 + vel_pitch1 * sr * cpi * dt
-              + vel_yaw1 * cr * cpi * dt;
-
-  vel_linear2_x = vel_linear1_x + acc_linear1_x * dt;
-  vel_linear2_y = vel_linear1_y + acc_linear1_y * dt;
-  vel_linear2_z = vel_linear1_z + acc_linear1_z * dt;
-
-  vel_roll2 = vel_roll1;
-  vel_pitch2 = vel_pitch1;
-  vel_yaw2 = vel_yaw1;
-
-  acc_linear2_x = acc_linear1_x;
-  acc_linear2_y = acc_linear1_y;
-  acc_linear2_z = acc_linear1_z;
-
-  fuse_core::wrapAngle2D(roll2);
-  fuse_core::wrapAngle2D(pitch2);
-  fuse_core::wrapAngle2D(yaw2);
+  predict(position1_x,
+          position1_y,
+          position1_z,
+          roll1,
+          pitch1,
+          yaw1,
+          vel_linear1_x,
+          vel_linear1_y,
+          vel_linear1_z,
+          vel_roll1,
+          vel_pitch1,
+          vel_yaw1,
+          acc_linear1_x,
+          acc_linear1_y,
+          acc_linear1_z,
+          dt,
+          position2_x,
+          position2_y,
+          position2_z,
+          roll2,
+          pitch2,
+          yaw2,
+          vel_linear2_x,
+          vel_linear2_y,
+          vel_linear2_z,
+          vel_roll2,
+          vel_pitch2,
+          vel_yaw2,
+          acc_linear2_x,
+          acc_linear2_y,
+          acc_linear2_z);
 
   if (jacobians)
   {
+    const double sr = ceres::sin(roll1);
+    const double cr = ceres::cos(roll1);
+
+    const double sp = ceres::sin(pitch1);
+    const double cp = ceres::cos(pitch1);
+    const double cpi = 1.0 / cp;
+    const double tp = sp * cpi;
+
+    const double sy = ceres::sin(yaw1);
+    const double cy = ceres::cos(yaw1);
+
     // Jacobian wrt position1
     if (jacobians[0])
     {
