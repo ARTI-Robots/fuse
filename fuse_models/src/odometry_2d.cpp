@@ -111,15 +111,15 @@ void Odometry2D::process(const nav_msgs::Odometry::ConstPtr& msg)
   pose->header = msg->header;
   pose->pose = msg->pose;
 
-  if (std::find_if(pose->pose.covariance.begin(), pose->pose.covariance.end(), 
-      [](auto &val){ return val != 0.0;} ) == pose->pose.covariance.end())
+  if (std::find_if(pose->pose.covariance.begin(), pose->pose.covariance.end(),
+      [](auto &val){ return val != 0.0;} ) == pose->pose.covariance.end())  // NOLINT(whitespace/braces)
   {
-    for(ssize_t row = 0; row < params_.pose_default_covariance.rows(); ++row)
+    for (ssize_t row = 0; row < params_.pose_default_covariance.rows(); ++row)
     {
-      for(ssize_t col = 0; col < params_.pose_default_covariance.cols(); ++col)
+      for (ssize_t col = 0; col < params_.pose_default_covariance.cols(); ++col)
       {
-        pose->pose.covariance[row*params_.pose_default_covariance.cols()+col] = params_.pose_default_covariance(row, col);
-        
+        pose->pose.covariance[row * params_.pose_default_covariance.cols() + col] =
+          params_.pose_default_covariance(row, col);
       }
     }
   }
@@ -129,15 +129,15 @@ void Odometry2D::process(const nav_msgs::Odometry::ConstPtr& msg)
   twist.header.frame_id = msg->child_frame_id;
   twist.twist = msg->twist;
 
-  if (std::find_if(twist.twist.covariance.begin(), twist.twist.covariance.end(), 
-      [](auto &val){ return val != 0.0;} ) == twist.twist.covariance.end())
+  if (std::find_if(twist.twist.covariance.begin(), twist.twist.covariance.end(),
+      [](auto &val){ return val != 0.0;} ) == twist.twist.covariance.end())  // NOLINT(whitespace/braces)
   {
-    for(ssize_t row = 0; row < params_.twist_default_covariance.rows(); ++row)
+    for (ssize_t row = 0; row < params_.twist_default_covariance.rows(); ++row)
     {
-      for(ssize_t col = 0; col < params_.twist_default_covariance.cols(); ++col)
+      for (ssize_t col = 0; col < params_.twist_default_covariance.cols(); ++col)
       {
-        twist.twist.covariance[row*params_.twist_default_covariance.cols()+col] = params_.twist_default_covariance(row, col);
-        
+        twist.twist.covariance[row * params_.twist_default_covariance.cols() + col] =
+          params_.twist_default_covariance(row, col);
       }
     }
   }
