@@ -1,7 +1,7 @@
 /*
  * Software License Agreement (BSD License)
  *
- *  Copyright (c) 2019, Locus Robotics
+ *  Copyright (c) 2018, Locus Robotics
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -31,16 +31,17 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef FUSE_MODELS_PARAMETERS_IMU_3D_PARAMS_H
-#define FUSE_MODELS_PARAMETERS_IMU_3D_PARAMS_H
+#ifndef FUSE_MODELS_PARAMETERS_ODOMETRY_3D_PARAMS_H
+#define FUSE_MODELS_PARAMETERS_ODOMETRY_3D_PARAMS_H
 
 #include <fuse_models/parameters/parameter_base.h>
 
 #include <fuse_core/loss.h>
 #include <fuse_core/parameter.h>
-#include <fuse_variables/acceleration_linear_3d_stamped.h>
 #include <fuse_variables/orientation_3d_stamped.h>
+#include <fuse_variables/position_3d_stamped.h>
 #include <fuse_variables/velocity_angular_3d_stamped.h>
+#include <fuse_variables/velocity_linear_3d_stamped.h>
 #include <ros/node_handle.h>
 
 #include <string>
@@ -54,9 +55,9 @@ namespace parameters
 {
 
 /**
- * @brief Defines the set of parameters required by the Imu3D class
+ * @brief Defines the set of parameters required by the Odometry3D class
  */
-struct Imu3DParams : public ParameterBase
+struct Odometry3DParams : public ParameterBase
 {
   public:
     /**
@@ -66,11 +67,12 @@ struct Imu3DParams : public ParameterBase
      */
     void loadFromROS(const ros::NodeHandle& nh) final
     {
+      position_indices = loadSensorConfig<fuse_variables::Position3DStamped>(nh, "position_dimensions");
+      orientation_indices = loadSensorConfig<fuse_variables::Orientation3DStamped>(nh, "orientation_dimensions");
+      linear_velocity_indices =
+        loadSensorConfig<fuse_variables::VelocityLinear3DStamped>(nh, "linear_velocity_dimensions");
       angular_velocity_indices =
         loadSensorConfig<fuse_variables::VelocityAngular3DStamped>(nh, "angular_velocity_dimensions");
-      linear_acceleration_indices =
-        loadSensorConfig<fuse_variables::AccelerationLinear3DStamped>(nh, "linear_acceleration_dimensions");
-      orientation_indices = loadSensorConfig<fuse_variables::Orientation3DStamped>(nh, "orientation_dimensions");
 
       nh.getParam("differential", differential);
       nh.getParam("disable_checks", disable_checks);
@@ -81,9 +83,10 @@ struct Imu3DParams : public ParameterBase
       fuse_core::getPositiveParam(nh, "throttle_period", throttle_period, false);
       nh.getParam("throttle_use_wall_time", throttle_use_wall_time);
 
-      nh.getParam("remove_gravitational_acceleration", remove_gravitational_acceleration);
-      nh.getParam("gravitational_acceleration", gravitational_acceleration);
       fuse_core::getParamRequired(nh, "topic", topic);
+
+      nh.getParam("twist_target_frame", twist_target_frame);
+      nh.getParam("pose_target_frame", pose_target_frame);
 
       if (differential)
       {
@@ -96,22 +99,9 @@ struct Imu3DParams : public ParameterBase
             fuse_core::getCovarianceDiagonalParam<6>(nh, "twist_covariance_offset_diagonal", 0.0);
       }
 
-      minimum_linear_acceleration_covariance =
-          fuse_core::getCovarianceDiagonalParam<3>(nh, "minimum_linear_acceleration_covariance_diagonal", 0.0);
-
-      minimum_angular_velocity_covariance =
-          fuse_core::getCovarianceDiagonalParam<3>(nh, "minimum_angular_velocity_covariance_diagonal", 0.0);
-
-      minimum_orientation_covariance =
-          fuse_core::getCovarianceDiagonalParam<3>(nh, "minimum_orientation_covariance_diagonal", 0.0);
-
-      nh.getParam("acceleration_target_frame", acceleration_target_frame);
-      nh.getParam("orientation_target_frame", orientation_target_frame);
-      nh.getParam("twist_target_frame", twist_target_frame);
-
       pose_loss = fuse_core::loadLossConfig(nh, "pose_loss");
+      linear_velocity_loss = fuse_core::loadLossConfig(nh, "linear_velocity_loss");
       angular_velocity_loss = fuse_core::loadLossConfig(nh, "angular_velocity_loss");
-      linear_acceleration_loss = fuse_core::loadLossConfig(nh, "linear_acceleration_loss");
     }
 
     bool differential { false };
@@ -121,10 +111,6 @@ struct Imu3DParams : public ParameterBase
     fuse_core::Matrix6d minimum_pose_relative_covariance;  //!< Minimum pose relative covariance matrix
     fuse_core::Matrix6d twist_covariance_offset;  //!< Offset already added to the twist covariance matrix, that will be
                                                   //!< subtracted in order to recover the raw values
-    fuse_core::Matrix3d minimum_linear_acceleration_covariance;  //!< Minimum linear acceleration covariance matrix
-    fuse_core::Matrix3d minimum_angular_velocity_covariance;  //!< Minimum angular velocity covariance matrix
-    fuse_core::Matrix3d minimum_orientation_covariance;  //!< Minimum orientation covariance matrix
-    bool remove_gravitational_acceleration { false };
     int queue_size { 10 };
     bool tcp_no_delay { false };  //!< Whether to use TCP_NODELAY, i.e. disable Nagle's algorithm, in the subscriber
                                   //!< socket or not. TCP_NODELAY forces a socket to send the data in its buffer,
@@ -134,21 +120,20 @@ struct Imu3DParams : public ParameterBase
     ros::Duration tf_timeout { 0.0 };  //!< The maximum time to wait for a transform to become available
     ros::Duration throttle_period { 0.0 };  //!< The throttle period duration in seconds
     bool throttle_use_wall_time { false };  //!< Whether to throttle using ros::WallTime or not
-    double gravitational_acceleration { 9.80665 };
-    std::string acceleration_target_frame {};
-    std::string orientation_target_frame {};
     std::string topic {};
+    std::string pose_target_frame {};
     std::string twist_target_frame {};
-    std::vector<size_t> angular_velocity_indices;
-    std::vector<size_t> linear_acceleration_indices;
+    std::vector<size_t> position_indices;
     std::vector<size_t> orientation_indices;
+    std::vector<size_t> linear_velocity_indices;
+    std::vector<size_t> angular_velocity_indices;
     fuse_core::Loss::SharedPtr pose_loss;
+    fuse_core::Loss::SharedPtr linear_velocity_loss;
     fuse_core::Loss::SharedPtr angular_velocity_loss;
-    fuse_core::Loss::SharedPtr linear_acceleration_loss;
 };
 
 }  // namespace parameters
 
 }  // namespace fuse_models
 
-#endif  // FUSE_MODELS_PARAMETERS_IMU_3D_PARAMS_H
+#endif  // FUSE_MODELS_PARAMETERS_ODOMETRY_3D_PARAMS_H

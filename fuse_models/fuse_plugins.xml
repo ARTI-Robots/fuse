@@ -67,6 +67,12 @@
     published by another node
     </description>
   </class>
+  <class type="fuse_models::Odometry3D" base_class_type="fuse_core::SensorModel">
+    <description>
+    An adapter-type sensor that produces pose (relative or absolute) and velocity constraints from sensor data
+    published by another node
+    </description>
+  </class>
   <class type="fuse_models::Pose2D" base_class_type="fuse_core::SensorModel">
     <description>
     An adapter-type sensor that produces absolute or relative pose constraints from information published by

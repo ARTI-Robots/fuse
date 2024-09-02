@@ -88,6 +88,7 @@ add_library(${PROJECT_NAME}
   src/imu_2d.cpp
   src/imu_3d.cpp
   src/odometry_2d.cpp
+  src/odometry_3d.cpp
   src/odometry_2d_publisher.cpp
   src/odometry_3d_publisher.cpp
   src/pose_2d.cpp

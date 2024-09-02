@@ -1870,8 +1870,8 @@ inline bool processTwist3DWithCovariance(
     velocity_angular->pitch() = transformed_message.twist.twist.angular.y;
     velocity_angular->yaw() = transformed_message.twist.twist.angular.z;
 
-    fuse_core::Vector3d angular_vel_vector;
-    angular_vel_vector << transformed_message.twist.twist.angular.x,
+    fuse_core::Vector3d angular_vel_mean;
+    angular_vel_mean << transformed_message.twist.twist.angular.x,
                           transformed_message.twist.twist.angular.y,
                           transformed_message.twist.twist.angular.z;
 
@@ -1881,6 +1881,17 @@ inline bool processTwist3DWithCovariance(
         transformed_message.twist.covariance[27], transformed_message.twist.covariance[28], transformed_message.twist.covariance[29],  // NOLINT
         transformed_message.twist.covariance[33], transformed_message.twist.covariance[34], transformed_message.twist.covariance[35];  // NOLINT
 
+    // Build the sub-vector and sub-matrices based on the requested indices
+    fuse_core::VectorXd angular_vel_mean_partial(angular_indices.size());
+    fuse_core::MatrixXd angular_vel_covariance_partial(angular_vel_mean_partial.rows(),
+                                                       angular_vel_mean_partial.rows());
+
+    populatePartialMeasurement(
+      angular_vel_mean,
+      angular_vel_covariance,
+      angular_indices,
+      angular_vel_mean_partial,
+      angular_vel_covariance_partial);
 
     bool add_constraint = true;
 
@@ -1888,7 +1899,7 @@ inline bool processTwist3DWithCovariance(
     {
       try
       {
-        validatePartialMeasurement(angular_vel_vector, angular_vel_covariance);
+        validatePartialMeasurement(angular_vel_mean_partial, angular_vel_covariance_partial);
       }
       catch (const std::runtime_error& ex)
       {
@@ -1901,7 +1912,7 @@ inline bool processTwist3DWithCovariance(
     if (add_constraint)
     {
       auto angular_vel_constraint = fuse_constraints::AbsoluteVelocityAngular3DStampedConstraint::make_shared(
-        source, *velocity_angular, angular_vel_vector, angular_vel_covariance, angular_indices);
+        source, *velocity_angular, angular_vel_mean_partial, angular_vel_covariance_partial, angular_indices);
 
       angular_vel_constraint->loss(angular_velocity_loss);
 
