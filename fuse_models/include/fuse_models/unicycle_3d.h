@@ -68,7 +68,7 @@ namespace fuse_models
  *  - ~buffer_length (double) The length of the graph state buffer and state history, in seconds
  *  - ~process_noise_diagonal (vector of doubles) An 15-dimensional vector containing the diagonal values for the
  *                                                process noise covariance matrix. Variable order is (x, y, z,
- *                                                qx, qy, qz, x_vel, y_vel, z_vel, roll_vel, pitch_vel, yaw_vel,
+ *                                                roll, pitch, yaw, x_vel, y_vel, z_vel, roll_vel, pitch_vel, yaw_vel,
  *                                                x_acc, y_acc, z_acc).
  */
 class Unicycle3D : public fuse_core::AsyncMotionModel

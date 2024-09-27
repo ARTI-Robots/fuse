@@ -43,6 +43,8 @@
 
 #include <cmath>
 
+#include <fuse_core/eigen.h>
+
 
 namespace fuse_core
 {
@@ -161,8 +163,8 @@ Eigen::Matrix<T, 2, 2, Eigen::RowMajor> rotationMatrix2D(const T angle)
  * @brief Compute roll, pitch, and yaw from a quaternion
  *
  * @param[in] q Pointer to the quaternion array (4x1 (order w, x, y, z))
- * @param[in] rpy Pointer to the roll, pitch, yaw array (3x1)
- * @param[in] jacobian Pointer to the jacobian matrix (3x4, optional)
+ * @param[out] rpy Pointer to the roll, pitch, yaw array (3x1)
+ * @param[out] jacobian Pointer to the jacobian matrix (3x4, optional)
  */
 static inline void quaternion2rpy(const double * q, double * rpy, double * jacobian = nullptr)
 {
@@ -240,6 +242,59 @@ static inline void quaternion2rpy(const double * q, double * rpy, double * jacob
         (4.0 * qz * (2.0 * qw * qz + 2.0 * qx * qy)) / std::pow((2.0 * qy * qy + 2.0 * qz * qz - 1.0), 2.0)) /
         (std::pow((2.0 * qw * qz + 2.0 * qx * qy), 2.0) / std::pow((2.0 * qy * qy + 2.0 * qz * qz - 1.0), 2.0) + 1.0);
     }
+  }
+}
+
+/**
+ * @brief Compute a quaternion from roll, pitch, and yaw
+ *
+ * @param[in] rpy Pointer to the roll, pitch, yaw array (3x1)
+ * @param[out] q Pointer to the quaternion array (4x1 (order w, x, y, z))
+ * @param[out] jacobian Pointer to the jacobian matrix (4x3, optional)
+ */
+static inline void rpy2quaternion(const double * rpy, double * q, double * jacobian = nullptr)
+{
+  const double ccc = cos(rpy[0] / 2.) * cos(rpy[1] / 2.) * cos(rpy[2] / 2.);
+  const double ccs = cos(rpy[0] / 2.) * cos(rpy[1] / 2.) * sin(rpy[2] / 2.);
+  const double csc = cos(rpy[0] / 2.) * sin(rpy[1] / 2.) * cos(rpy[2] / 2.);
+  const double scc = sin(rpy[0] / 2.) * cos(rpy[1] / 2.) * cos(rpy[2] / 2.);
+  const double ssc = sin(rpy[0] / 2.) * sin(rpy[1] / 2.) * cos(rpy[2] / 2.);
+  const double sss = sin(rpy[0] / 2.) * sin(rpy[1] / 2.) * sin(rpy[2] / 2.);
+  const double scs = sin(rpy[0] / 2.) * cos(rpy[1] / 2.) * sin(rpy[2] / 2.);
+  const double css = cos(rpy[0] / 2.) * sin(rpy[1] / 2.) * sin(rpy[2] / 2.);
+
+  q[0] = ccc + sss;
+  q[1] = scc - css;
+  q[2] = csc + scs;
+  q[3] = ccs - ssc;
+
+  if (jacobian)
+  {
+    Eigen::Map<Eigen::Matrix<double, 4, 3, Eigen::RowMajor>> jacobian_map(jacobian);
+
+    // dqw/d(rpy)
+    jacobian_map.row(0) <<
+      (css - scc) / 2.,  // droll
+      (scs - csc) / 2.,  // dpitch
+      (ssc - ccs) / 2.;  // dyaw
+
+    // dqx/d(rpy)
+    jacobian_map.row(1) <<
+      (ccc + sss) / 2.,  // droll
+      -(ssc + ccs) / 2.,  // dpitch
+      -(csc + scs) / 2.;  // dyaw
+
+    // dqy/d(rpy)
+    jacobian_map.row(2) <<
+      (ccs - ssc) / 2.,  // droll
+      (ccc - sss) / 2.,  // dpitch
+      (scc - css) / 2.;  // dyaw
+
+    // dqz/d(rpy)
+    jacobian_map.row(3) <<
+      -(csc + scs) / 2.,  // droll
+      -(css + scc) / 2.,  // dpitch
+      (ccc + sss) / 2.;  // dyaw
   }
 }
 
@@ -338,6 +393,264 @@ static inline void quaternionToAngleAxis(const double * q, double * angle_axis, 
       jacobian_map(3, 3) = 2.0;
     }
   }
+}
+
+/**
+ * @brief Compute the jacobian of a quaternion normalization
+ *
+ * @param[in] q The quaternion
+ * @return      The jacobian of the quaternion normalization
+ */
+static inline fuse_core::Matrix4d jacobianQuatNormalization(Eigen::Quaterniond q)
+{
+  fuse_core::Matrix4d ret;
+  ret <<
+     q.x() * q.x() + q.y() * q.y() + q.z() * q.z(), -q.w() * q.x(), -q.w() * q.y(), -q.w() * q.z(),
+     -q.x() * q.w(), q.w() * q.w() + q.y() * q.y() + q.z() * q.z(), -q.x() * q.y(), -q.x() * q.z(),
+     -q.y() * q.w(), -q.y() * q.x(), q.w() * q.w() + q.x() * q.x() + q.z() * q.z(), -q.y() * q.z(),
+     -q.z() * q.w(), -q.z() * q.x(), -q.z() * q.y(), q.w() * q.w() + q.x() * q.x() + q.y() * q.y();
+
+  ret /= std::pow(q.norm(), 3.);
+  return ret;
+}
+
+/**
+ * @brief Convert a pose covariance in x, y, z, roll, pitch, yaw to a pose covariance in x, y, z, qw, qx, qy, qz
+ *
+ * @param[in] pose    The pose which covariance should be converted
+ * @param[in] cov_rpy The covariance in x, y, z, roll, pitch, yaw
+ * @return            The pose covariance in x, y, z, qw, qx, qy, qz
+ */
+static inline fuse_core::Matrix7d convertToPoseQuatCovariance(
+  const Eigen::Isometry3d& pose, const fuse_core::Matrix6d& cov_rpy)
+{
+  double rpy[3];
+  Eigen::Quaterniond q(pose.rotation());
+  double q_array[4] = {  // NOLINT(whitespace/braces)
+    q.w(),
+    q.x(),
+    q.y(),
+    q.z()
+  };
+  quaternion2rpy(q_array, rpy);
+
+  double J_rpy2quat[12];
+  rpy2quaternion(rpy, q_array, J_rpy2quat);
+
+  Eigen::Map<Eigen::Matrix<double, 4, 3, Eigen::RowMajor>> J_rpy2quat_map(J_rpy2quat);
+
+  Eigen::Matrix<double, 7, 6, Eigen::RowMajor> J;
+  J.topLeftCorner<3, 3>().setIdentity();
+  J.topRightCorner<3, 3>().setZero();
+  J.bottomLeftCorner<4, 3>().setZero();
+  J.bottomRightCorner<4, 3>() = J_rpy2quat_map;
+
+  return J * cov_rpy * J.transpose();
+}
+
+/**
+ * @brief Convert a pose covariance in x, y, z, qw, qx, qy, qz to a pose covariance in x, y, z, roll, pitch, yaw
+ *
+ * @param[in] pose    The pose which covariance should be converted
+ * @param[in] cov_rpy The covariance in x, y, z, qw, qx, qy, qz
+ * @return            The pose covariance in x, y, z, roll, pitch, yaw
+ */
+static inline fuse_core::Matrix6d convertToPoseRPYCovariance(
+  const Eigen::Isometry3d& pose, const fuse_core::Matrix7d& cov_quat)
+{
+  Eigen::Quaterniond q(pose.rotation());
+  double q_array[4] = {  // NOLINT(whitespace/braces)
+    q.w(),
+    q.x(),
+    q.y(),
+    q.z()
+  };
+  double rpy[3];
+  double J_quat2rpy[12];
+  quaternion2rpy(q_array, rpy, J_quat2rpy);
+  Eigen::Map<fuse_core::Matrix<double, 3, 4>> J_quat2rpy_map(J_quat2rpy);
+  Eigen::Matrix<double, 6, 7, Eigen::RowMajor> J;
+  J.topLeftCorner<3, 3>().setIdentity();
+  J.topRightCorner<3, 4>().setZero();
+  J.bottomLeftCorner<3, 3>().setZero();
+  J.bottomRightCorner<3, 4>() = J_quat2rpy_map * jacobianQuatNormalization(q);
+
+  return J * cov_quat * J.transpose();
+}
+
+/**
+ * @brief Compute the pose covariance of an inverted pose
+ *
+ * @param[in] pose The pose which will be inverted
+ * @param[in] cov  The covariance of the pose which will be inverted (order: x, y, z, roll, pitch, yaw)
+ * @return         The pose covariance of the inverted pose (order: x, y, z, roll, pitch, yaw)
+ */
+static inline fuse_core::Matrix6d invertPoseCovariance(
+  const Eigen::Isometry3d& pose, const fuse_core::Matrix6d& cov)
+{
+  // convert the covariances from 3D + roll-pitch-yaw to 3D + quaternion
+  auto cov_quat = convertToPoseQuatCovariance(pose, cov);
+
+  // compute the inverse pose covariance with 3D + quaternion
+  const Eigen::Quaterniond q(pose.rotation());
+
+  const double dx = (0 - pose.translation().x());
+  const double dy = (0 - pose.translation().y());
+  const double dz = (0 - pose.translation().z());
+  Eigen::Matrix<double, 3, 4, Eigen::RowMajor> fqrir;
+  fqrir <<
+    -q.y() * dz + q.z() * dy, q.y() * dy + q.z() * dz, q.x() * dy - 2 * q.y() * dx - q.w() * dz, q.x() * dz + q.w() * dy - 2 * q.z() * dx,  // NOLINT(whitespace/line_length)
+    q.x() * dz - q.z() * dx, q.y() * dx - 2 * q.x() * dy + q.w() * dz, q.x() * dx + q.z() * dz, -q.w() * dx - 2 * q.z() * dy + q.y() * dz,  // NOLINT(whitespace/line_length)
+    q.y() * dx - q.x() * dy, q.z() * dx - q.w() * dy - 2 * q.x() * dz, q.z() * dy + q.w() * dx - 2 * q.y() * dz, q.x() * dx + q.y() * dy;  // NOLINT(whitespace/line_length)
+  fqrir *= 2;
+  fqrir.applyOnTheRight(jacobianQuatNormalization(q));
+
+
+  Eigen::Matrix<double, 3, 7, Eigen::RowMajor> fqri;
+  fqri.leftCols<3>() <<
+    2 * q.y() * q.y() + 2 * q.z() * q.z() - 1, -2 * q.w() * q.z() - 2 * q.x() * q.y(), 2 * q.w() * q.y() - 2 * q.x() * q.z(),  // NOLINT(whitespace/line_length)
+    2 * q.w() * q.z() - 2 * q.x() * q.y(), 2 * q.x() * q.x() + 2 * q.z() * q.z() - 1, -2 * q.w() * q.x() - 2 * q.y() * q.z(),  // NOLINT(whitespace/line_length)
+    -2 * q.w() * q.y() - 2 * q.x() * q.z(), 2 * q.w() * q.x() - 2 * q.y() * q.z(), 2 * q.x() * q.x() + 2 * q.y() * q.y() - 1;  // NOLINT(whitespace/line_length)
+  fqri.rightCols<4>() = fqrir;
+
+  fuse_core::Matrix7d fqi;
+  fqi.topRows<3>() = fqri;
+  fqi.bottomLeftCorner<4, 3>().setZero();
+  fqi.bottomRightCorner<4, 4>() <<
+    1,  0,  0,  0,
+    0, -1,  0,  0,
+    0,  0, -1,  0,
+    0,  0,  0, -1;
+  fqi.bottomRightCorner<4, 4>().applyOnTheRight(jacobianQuatNormalization(q));
+
+  fuse_core::Matrix7d cov_inverse_quat = fqi * cov_quat * fqi.transpose();
+
+  // convert back to 3D + roll-pitch-yaw
+  const auto pose_inverse = pose.inverse();
+  return convertToPoseRPYCovariance(pose_inverse, cov_inverse_quat);
+}
+
+/**
+ * @brief Compute the jacobian of a pose composition wrt pose 1 (composition: pose3 = pose1 + pose2)
+ *
+ * @param[in] pose1 The pose 1 of the pose composition
+ * @param[in] pose2 The pose 2 of the pose composition
+ * @return          The jacobian of the pose composition wrt pose 1 (order: x, y, z, qw, qx, qy, qz)
+ */
+static inline fuse_core::Matrix7d jacobianPosePoseCompositionA(
+  const Eigen::Isometry3d& pose1, const Eigen::Isometry3d& pose2)
+{
+  const Eigen::Quaterniond q1(pose1.rotation());
+  const Eigen::Quaterniond q2(pose2.rotation());
+  const Eigen::Vector3d a(pose2.translation());
+  Eigen::Matrix<double, 3, 7, Eigen::RowMajor> fqr_pose1;
+  fqr_pose1.leftCols<3>().setIdentity();
+
+  fqr_pose1(0, 3) = -q1.z() * a.y() + q1.y() * a.z();
+  fqr_pose1(0, 4) = q1.y() * a.y() + q1.z() * a.z();
+  fqr_pose1(0, 5) = -2 * q1.y() * a.x() + q1.x() * a.y() + q1.w() * a.z();
+  fqr_pose1(0, 6) = -2 * q1.z() * a.x() - q1.w() * a.y() + q1.x() * a.z();
+
+  fqr_pose1(1, 3) = q1.z() * a.x() - q1.x() * a.z();
+  fqr_pose1(1, 4) = q1.y() * a.x() - 2 * q1.x() * a.y() - q1.w() * a.z();
+  fqr_pose1(1, 5) = q1.x() * a.x() + q1.z() * a.z();
+  fqr_pose1(1, 6) = q1.w() * a.x() - 2 * q1.z() * a.y() + q1.y() * a.z();
+
+  fqr_pose1(2, 3) = -q1.y() * a.x() + q1.x() * a.y();
+  fqr_pose1(2, 4) = q1.z() * a.x() + q1.w() * a.y() - 2 * q1.x() * a.z();
+  fqr_pose1(2, 5) = -q1.w() * a.x() + q1.z() * a.y() - 2 * q1.y() * a.z();
+  fqr_pose1(2, 6) = q1.x() * a.x() + q1.y() * a.y();
+
+  fqr_pose1.rightCols<4>() *= 2;
+
+  fqr_pose1.rightCols<4>().applyOnTheRight(jacobianQuatNormalization(q1));
+
+  fuse_core::Matrix7d fqc_pose1;
+  fqc_pose1.topRows<3>() = fqr_pose1;
+  fqc_pose1.bottomLeftCorner<4, 3>().setZero();
+  fqc_pose1.bottomRightCorner<4, 4>() <<
+    q2.w(), -q2.x(), -q2.y(), -q2.z(),
+    q2.x(), q2.w(), q2.z(), -q2.y(),
+    q2.y(), -q2.z(), q2.w(), q2.x(),
+    q2.z(), q2.y(), -q2.x(), q2.w();
+
+  return fqc_pose1;
+}
+
+/**
+ * @brief Compute the jacobian of a pose composition wrt pose 2 (composition: pose3 = pose1 + pose2)
+ *
+ * @param[in] pose1 The pose 1 of the pose composition
+ * @return          The jacobian of the pose composition wrt pose 2 (order: x, y, z, qw, qx, qy, qz)
+ */
+static inline fuse_core::Matrix7d jacobianPosePoseCompositionB(
+  const Eigen::Isometry3d& pose1)
+{
+  const Eigen::Quaterniond q1(pose1.rotation());
+
+  fuse_core::Matrix3d fqr_position2;
+  fqr_position2 <<
+    0.5 - q1.y() * q1.y() - q1.z() * q1.z(), q1.x() * q1.y() - q1.w() * q1.z(), q1.w() * q1.y() + q1.x() * q1.z(),
+    q1.w() * q1.z() + q1.x() * q1.y(), 0.5 - q1.x() * q1.x() - q1.z() * q1.z(), q1.y() * q1.z() - q1.w() * q1.x(),
+    q1.x() * q1.z() - q1.w() * q1.y(), q1.w() * q1.x() + q1.y() * q1.z(), 0.5 - q1.x() * q1.x() - q1.y() * q1.y();
+  fqr_position2 *= 2;
+
+  fuse_core::Matrix7d fqc_pose2;
+  fqc_pose2.topLeftCorner<3, 3>() = fqr_position2;
+  fqc_pose2.topRightCorner<3, 4>().setZero();
+  fqc_pose2.bottomLeftCorner<4, 3>().setZero();
+  fqc_pose2.bottomRightCorner<4, 4>() <<
+    q1.w(), -q1.x(), -q1.y(), -q1.z(),
+    q1.x(), q1.w(), -q1.z(), q1.y(),
+    q1.y(), q1.z(), q1.w(), -q1.x(),
+    q1.z(), -q1.y(), q1.x(), q1.w();
+
+  return fqc_pose2;
+}
+
+/**
+ * @brief Compute the covariance after a pose composition (composition: pose3 = pose1 + pose2)
+ *
+ * @param[in] pose1 The pose 1 of the pose composition
+ * @param[in] cov1  The covariance of pose 1 of the pose composition (order: x, y, z, roll, pitch, yaw)
+ * @param[in] pose2 The pose 2 of the pose composition
+ * @param[in] cov2  The covariance of pose 2 of the pose composition (order: x, y, z, roll, pitch, yaw)
+ * @return          The covariance after the pose composition (order: x, y, z, roll, pitch, yaw)
+ */
+static inline fuse_core::Matrix6d composePoseCovariance(
+  const Eigen::Isometry3d& pose1, const fuse_core::Matrix6d& cov1,
+  const Eigen::Isometry3d& pose2, const fuse_core::Matrix6d& cov2)
+{
+  const auto pose3 = pose1 * pose2;
+  const Eigen::Quaterniond q3(pose3.rotation());
+
+  // first, convert the covariances from 3D + roll-pitch-yaw to 3D + quaternion
+  const auto cov1_quat = convertToPoseQuatCovariance(pose1, cov1);
+  const auto cov2_quat = convertToPoseQuatCovariance(pose2, cov2);
+
+  // now compose the two covariances
+  const Eigen::Quaterniond q1(pose1.rotation());
+  const Eigen::Quaterniond q2(pose2.rotation());
+  const Eigen::Vector3d a(pose2.translation());
+
+  fuse_core::Matrix7d fqc_pose1 = jacobianPosePoseCompositionA(pose1, pose2);
+
+  fuse_core::Matrix7d fqc_pose2 = jacobianPosePoseCompositionB(pose1);
+
+  const auto fqn_pose3 = jacobianQuatNormalization(q3);
+
+  fuse_core::Matrix7d fqc_pose1_including_fqn = fqc_pose1;
+  fqc_pose1_including_fqn.bottomRightCorner<4, 4>().applyOnTheLeft(fqn_pose3);
+
+  fuse_core::Matrix7d fqc_pose2_including_fqn = fqc_pose2;
+  fqc_pose2_including_fqn.bottomRightCorner<4, 4>().applyOnTheLeft(fqn_pose3);
+
+  const fuse_core::Matrix7d cov3_quat =
+    fqc_pose1_including_fqn * cov1_quat * fqc_pose1_including_fqn.transpose() +
+    fqc_pose2_including_fqn * cov2_quat * fqc_pose2_including_fqn.transpose();
+
+  // convert back to 3D + roll-pitch-yaw
+  return convertToPoseRPYCovariance(pose3, cov3_quat);
 }
 
 }  // namespace fuse_core

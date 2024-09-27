@@ -64,6 +64,7 @@
 #include <tf2_ros/transform_listener.h>
 #include <tf2_2d/tf2_2d.h>
 #include <tf2_2d/transform.h>
+#include <tf2_eigen/tf2_eigen.h>
 
 #include <boost/range/join.hpp>
 
@@ -913,229 +914,92 @@ inline bool processDifferentialPose3DWithCovariance(
   orientation2->y() = pose2.pose.pose.orientation.y;
   orientation2->z() = pose2.pose.pose.orientation.z;
 
-  // Create the delta for the constraint
-  tf2::Transform pose1_tf;
-  tf2::fromMsg(pose1.pose.pose, pose1_tf);
-  tf2::Transform pose2_tf;
-  tf2::fromMsg(pose2.pose.pose, pose2_tf);
+  // Method adapted from https://github.com/locusrobotics/fuse/blob/90ded4ba333b426ad56d25eddf575c9b6027dfa7/fuse_models/include/fuse_models/common/sensor_proc.hpp#L1003 NOLINT(whitespace/line_length)
 
-  const auto delta = pose1_tf.inverseTimes(pose2_tf);
-  double delta_quat[4] = {delta.getRotation().w(),  // NOLINT(whitespace/braces)
-                    delta.getRotation().x(),
-                    delta.getRotation().y(),
-                    delta.getRotation().z()};  // NOLINT(whitespace/braces)
+  // Convert from ROS msg to Eigen
+  Eigen::Isometry3d p1, p2;
+  tf2::fromMsg(pose1.pose.pose, p1);
+  const Eigen::Map<const Eigen::Matrix<double, 6, 6, Eigen::RowMajor>> cov1(pose1.pose.covariance.data());
+  tf2::fromMsg(pose2.pose.pose, p2);
+  const Eigen::Map<const Eigen::Matrix<double, 6, 6, Eigen::RowMajor>> cov2(pose2.pose.covariance.data());
 
-  double delta_rpy[3];
-  fuse_core::quaternion2rpy(delta_quat, delta_rpy);
+  Eigen::Isometry3d p12 = p1.inverse() * p2;
+  fuse_core::Matrix6d cov12;
 
-  fuse_core::Vector6d pose_relative_mean;
-  pose_relative_mean <<
-    delta.getOrigin().x(), delta.getOrigin().y(), delta.getOrigin().z(),
-    delta_rpy[0], delta_rpy[1], delta_rpy[2];
-
-  // Create the covariance components for the constraint
-  Eigen::Map<const fuse_core::Matrix6d> cov1(pose1.pose.covariance.data());
-  Eigen::Map<const fuse_core::Matrix6d> cov2(pose2.pose.covariance.data());
-
-  // TODO(fhirmann): Implement correctly
-  throw "processDifferentialPose3DWithCovariance is not fully implemented yet";
-
-  fuse_core::Matrix6d pose_relative_covariance;
   if (independent)
   {
-    // TODO(fhirmann): Implement correctly
+    const auto cov1_inverse = fuse_core::invertPoseCovariance(p1, cov1);
 
-    // // Compute Jacobians so we can rotate the covariance
-    // fuse_core::Matrix3d j_pose1;
-    // j_pose1 <<
-    //   -cy,  sy,  sy * x_diff + cy * y_diff,
-    //   -sy, -cy, -cy * x_diff + sy * y_diff,
-    //     0,   0,                         -1;
-
-    // fuse_core::Matrix3d j_pose2;
-    // j_pose2 <<
-    //    cy, -sy,  0,
-    //    sy,  cy,  0,
-    //     0,   0,  1;
-
-    // pose_relative_covariance = j_pose1 * cov1 * j_pose1.transpose() + j_pose2 * cov2 * j_pose2.transpose();
+    cov12 = fuse_core::composePoseCovariance(
+      p1.inverse(), cov1_inverse,
+      p2, cov2);
   }
   else
   {
-    // TODO(fhirmann): Implement correctly
+    // If covariances of p1 and p2 are the same, then it's possible that p12 covariance will be
+    // zero or ill-conditioned. To avoid this, we skip the expensive following calculations and
+    // instead we just add a minimum covariance later
+    if (cov1.isApprox(cov2, 1e-9))
+    {
+      cov12.setZero();
+    }
+    else
+    {
+      // Here we assume that poses are computed incrementally, so: p2 = p1 * p12.
+      // We know cov1 and cov2 and we should subtract the first to the second in order
+      // to obtain the relative pose covariance. But first the 2 of them have to be in the
+      // same reference frame, moreover we need to rotate the result in p12 reference frame
+      // The covariance propagation of p2 = p1 * p12 is:
+      //
+      // C2 = J_p1 * C1 * J_p1^T + J_p12 * C12 * J_p12^T
+      //
+      // where C1, C2, C12 are the covariance matrices of p1, p2 and dp, respectively, and J_p1 and
+      // J_p12 are the jacobians of the equation (pose composition) wrt p1 and p12, respectively.
+      //
+      // Therefore, the covariance C12 of the relative pose p12 is:
+      //
+      // C12 = J_p12^-1 * (C2 - J_p1 * C1 * J_p1^T) * J_p12^-T
 
-    // For dependent pose measurements p1 and p2, we assume they're computed as:
-    //
-    // p2 = p1 * p12    [1]
-    //
-    // where p12 is the relative pose between p1 and p2, which is computed here as:
-    //
-    // p12 = p1^-1 * p2
-    //
-    // Note that the twist t12 is computed as:
-    //
-    // t12 = p12 / dt
-    //
-    // where dt = t2 - t1, for t1 and t2 being the p1 and p2 timestamps, respectively.
-    //
-    // The covariance propagation of p2 = p1 * p12 is:
-    //
-    // C2 = J_p1 * C1 * J_p1^T + J_p12 * C12 * J_p12^T
-    //
-    // where C1, C2, C12 are the covariance matrices of p1, p2 and dp, respectively, and J_p1 and J_p12 are the
-    // jacobians of the equation wrt p1 and p12, respectively.
-    //
-    // Therefore, the covariance C12 of the relative pose p12 is:
-    //
-    // C12 = J_p12^-1 * (C2 - J_p1 * C1 * J_p1^T) * J_p12^-T    [2]
-    //
-    //
-    //
-    // In SE(2) the poses are represented by:
-    //
-    //     (R | t)
-    // p = (-----)
-    //     (0 | 1)
-    //
-    // where R is the rotation matrix for the yaw angle:
-    //
-    //     (cos(yaw) -sin(yaw))
-    // R = (sin(yaw)  cos(yaw))
-    //
-    // and t is the translation:
-    //
-    //     (x)
-    // t = (y)
-    //
-    // The pose composition/multiplication in SE(2) is defined as follows:
-    //
-    //           (R1 | t1)   (R2 | t2)   (R1 * R2 | R1 * t2 + t1)
-    // p1 * p2 = (-------) * (-------) = (----------------------)
-    //           ( 0 |  1)   ( 0 |  1)   (      0 |            1)
-    //
-    // which gives the following equations for each component:
-    //
-    // x = x2 * cos(yaw1) - y2 * sin(yaw1) + x1
-    // y = x2 * sin(yaw1) + y2 * cos(yaw1) + y1
-    // yaw = yaw1 + yaw2
-    //
-    // Since the covariance matrices are defined following that same order for the SE(2) components:
-    //
-    //     (xx   xy   xyaw  )
-    // C = (yx   yy   yyaw  )
-    //     (yawx yawy yawyaw)
-    //
-    // the jacobians must be defined following the same order.
-    //
-    // The jacobian wrt p1 is:
-    //
-    //        (1 0 | -sin(yaw1) * x2 - cos(yaw1) * y2)
-    // J_p1 = (0 1 |  cos(yaw1) * x2 - sin(yaw1) * y2)
-    //        (0 0 |                                1)
-    //
-    // The jacobian wrt p2 is:
-    //
-    //        (R1 | 0)   (cos(yaw1) -sin(yaw1) 0)
-    // J_p2 = (------) = (sin(yaw1)  cos(yaw1) 0)
-    //        ( 0 | 1)   (        0          0 1)
-    //
-    //
-    //
-    // Therefore, for the the covariance propagation of [1] we would get the following jacobians:
-    //
-    //        (1 0 | -sin(yaw1) * x12 - cos(yaw1) * y12)
-    // J_p1 = (0 1 |  cos(yaw1) * x12 - sin(yaw1) * y12)
-    //        (0 0 |                                  1)
-    //
-    //         (R1 | 0)   (cos(yaw1) -sin(yaw1) 0)
-    // J_p12 = (------) = (sin(yaw1)  cos(yaw1) 0)
-    //         ( 0 | 1)   (        0          0 1)
-    //
-    //
-    //
-    // At this point we could go one step further since p12 = t12 * dt and include the jacobian of this additional
-    // equation:
-    //
-    // J_t12 = dt * Id
-    //
-    // where Id is a 3x3 identity matrix.
-    //
-    // However, that would give us the covariance of the twist t12, and here we simply need the one of the relative
-    // pose p12.
-    //
-    //
-    //
-    // Finally, since we need the inverse of the jacobian J_p12, we can use the inverse directly:
-    //
-    //            ( cos(yaw1) sin(yaw1) 0)
-    // J_p12^-1 = (-sin(yaw1) cos(yaw1) 0)
-    //            (         0         0 1)
-    //
-    //
-    //
-    // In the implementation below we use:
-    //
-    // sy = sin(-yaw1)
-    // cy = cos(-yaw1)
-    //
-    // which are defined before.
-    //
-    // Therefore, the jacobians end up with the following expressions:
-    //
-    //        (1 0 | sin(-yaw1) * x12 - cos(-yaw1) * y12)
-    // J_p1 = (0 1 | cos(-yaw1) * x12 + sin(-yaw1) * y12)
-    //        (0 0 |                                   1)
-    //
-    //            (cos(-yaw1) -sin(-yaw1) 0)
-    // J_p12^-1 = (sin(-yaw1)  cos(-yaw1) 0)
-    //            (         0           0 1)
-    //
-    //
-    //
-    // Note that the covariance propagation expression derived here for dependent pose measurements gives more accurate
-    // results than simply changing the sign in the expression for independent pose measurements, which would be:
-    //
-    // C12 = J_p2 * C2 * J_p2^T - J_p1 * C1 * J_p1^T
-    //
-    // where J_p1 and J_p2 are the jacobians for p12 = p1^-1 * p2 (we're abusing the notation here):
-    //
-    //        (-cos(-yaw1),  sin(-yaw1),  sin(-yaw1) * x12 + cos(-yaw1) * y12)
-    // J_p1 = (-sin(-yaw1), -cos(-yaw1), -cos(-yaw1) * x12 + sin(-yaw1) * y12)
-    //        (          0,           0,                                   -1)
-    //
-    //        (R1 | 0)   (cos(yaw1) -sin(yaw1) 0)
-    // J_p2 = (------) = (sin(yaw1)  cos(yaw1) 0)
-    //        ( 0 | 1)   (        0          0 1)
-    //
-    // which are the j_pose1 and j_pose2 jacobians used above for the covariance propagation expresion for independent
-    // pose measurements.
-    //
-    // This seems to be the approach adviced in https://github.com/cra-ros-pkg/robot_localization/issues/356, but after
-    // comparing the resulting relative pose covariance C12 and the twist covariance, we can conclude that the approach
-    // proposed here is the only one that allow us to get results that match.
-    //
-    // The relative pose covariance C12 and the twist covariance T12 can be compared with:
-    //
-    // T12 = J_t12 * C12 * J_t12^T
-    //
-    //
-    //
-    // In some cases the difference between the C1 and C2 covariance matrices is very small and it could yield to an
-    // ill-conditioned C12 covariance. For that reason a minimum covariance is added to [2].
-    // fuse_core::Matrix3d j_pose1;
-    // j_pose1 << 1, 0, sy * pose_relative_mean(0) - cy * pose_relative_mean(1),
-    //            0, 1, cy * pose_relative_mean(0) + sy * pose_relative_mean(1),
-    //            0, 0, 1;
+      // First we need to convert covariances from RPY (6x6) to quaternion (7x7)
+      fuse_core::Matrix7d cov1_q = fuse_core::convertToPoseQuatCovariance(p1, cov1);
+      fuse_core::Matrix7d cov2_q = fuse_core::convertToPoseQuatCovariance(p2, cov2);
 
-    // fuse_core::Matrix3d j_pose12_inv;
-    // j_pose12_inv << cy, -sy, 0,
-    //                 sy,  cy, 0,
-    //                  0,   0, 1;
+      // Now we have to compute pose composition jacobians so we can rotate covariances
+      const auto j_qn = fuse_core::jacobianQuatNormalization(Eigen::Quaterniond(p12.rotation()));
 
-    // pose_relative_covariance = j_pose12_inv * (cov2 - j_pose1 * cov1 * j_pose1.transpose()) *
-    //                            j_pose12_inv.transpose() +
-    //                            minimum_pose_relative_covariance;
+      auto j_p1 = fuse_core::jacobianPosePoseCompositionA(p1, p12);
+      j_p1.block<4, 4>(3, 3).applyOnTheLeft(j_qn);
+      j_p1.block<4, 3>(3, 0).setZero();
+
+      auto j_p12 = fuse_core::jacobianPosePoseCompositionB(p1);
+      j_p12.block<4, 4>(3, 3).applyOnTheLeft(j_qn);
+      j_p12.block<3, 4>(0, 3).setZero();
+      j_p12.block<4, 3>(3, 0).setZero();
+
+      // TODO(giafranchini): check if faster to use j12.llt().solve() instead
+      const auto j_p12_inv = j_p12.colPivHouseholderQr().solve(fuse_core::Matrix7d::Identity());
+      const auto cov12_q = j_p12_inv * (cov2_q - j_p1 * cov1_q * j_p1.transpose()) * j_p12_inv.transpose();
+
+      // Now again convert the delta pose covariance back to RPY(6x6)
+      cov12 = fuse_core::convertToPoseRPYCovariance(p12, cov12_q);
+    }
   }
+
+  Eigen::Quaterniond delta_q(p12.rotation());
+  double delta_q_array[4] = {delta_q.w(),  // NOLINT(whitespace/braces)
+                             delta_q.x(),
+                             delta_q.y(),
+                             delta_q.z()};  // NOLINT(whitespace/braces)
+
+  double delta_rpy[3];
+  fuse_core::quaternion2rpy(delta_q_array, delta_rpy);
+
+  fuse_core::Vector6d pose_relative_mean;
+  pose_relative_mean <<
+    p12.translation().x(), p12.translation().y(), p12.translation().z(),
+    delta_rpy[0], delta_rpy[1], delta_rpy[2];
+
+  fuse_core::Matrix6d pose_relative_covariance = cov12 + minimum_pose_relative_covariance;
 
   // Build the sub-vector and sub-matrices based on the requested indices
   fuse_core::VectorXd pose_relative_mean_partial(position_indices.size() + orientation_indices.size());

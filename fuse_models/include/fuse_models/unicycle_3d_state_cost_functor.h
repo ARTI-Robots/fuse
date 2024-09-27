@@ -45,8 +45,6 @@
 namespace fuse_models
 {
 
-// TODO(fhirmann): Update documentation
-
 /**
  * @brief Create a cost function for a 3D state vector
  * 
@@ -107,7 +105,7 @@ public:
    *
    * @param[in] dt The time delta across which to generate the kinematic model cost
    * @param[in] A The residual weighting matrix, most likely the square root information matrix in order
-   *              (x, y, z, qx, qy, qz, x_vel, y_vel, z_vel, roll_vel, pitch_vel, yaw_vel, x_acc, y_acc, z_acc)
+   *              (x, y, z, roll, pitch, yaw, x_vel, y_vel, z_vel, roll_vel, pitch_vel, yaw_vel, x_acc, y_acc, z_acc)
    */
   Unicycle3DStateCostFunctor(const double dt, const fuse_core::Matrix15d& A);
 

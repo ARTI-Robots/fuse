@@ -90,7 +90,7 @@ public:
    * @param[in] angular_velocity2 Angular velocity component variable of the second state
    * @param[in] linear_acceleration2 Linear acceleration component variable of the second state
    * @param[in] covariance - The covariance matrix used to weight the constraint. Order is
-   *                         (x, y, z, qx, qy, qz,
+   *                         (x, y, z, roll, pitch, yaw,
    *                          x_vel, y_vel, z_vel, roll_vel, pitch_vel, yaw_vel,
    *                          x_acc, y_acc, z_acc)
    */
@@ -122,14 +122,14 @@ public:
   /**
    * @brief Read-only access to the square root information matrix.
    *
-   * Order is (x, y, z, qx, qy, qz, x_vel, y_vel, z_vel, roll_vel, pitch_vel, yaw_vel, x_acc, y_acc, z_acc)
+   * Order is (x, y, z, roll, pitch, yaw, x_vel, y_vel, z_vel, roll_vel, pitch_vel, yaw_vel, x_acc, y_acc, z_acc)
    */
   const fuse_core::Matrix15d& sqrtInformation() const { return sqrt_information_; }
 
   /**
    * @brief Compute the measurement covariance matrix.
    *
-   * Order is (x, y, z, qx, qy, qz, x_vel, y_vel, z_vel, roll_vel, pitch_vel, yaw_vel, x_acc, y_acc, z_acc)
+   * Order is (x, y, z, roll, pitch, yaw, x_vel, y_vel, z_vel, roll_vel, pitch_vel, yaw_vel, x_acc, y_acc, z_acc)
    */
   fuse_core::Matrix15d covariance() const { return (sqrt_information_.transpose() * sqrt_information_).inverse(); }
 

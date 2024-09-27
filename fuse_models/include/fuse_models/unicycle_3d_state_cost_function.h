@@ -78,10 +78,10 @@ namespace fuse_models
  *             ||    [          z_t2 - proj(z_t1)         ] ||
  *             ||    [       roll_t2 - proj(roll_t1)      ] ||
  *             ||    [      pitch_t2 - proj(pitch_t1)     ] ||
- *             ||    [      z_vel_t2 - proj(z_vel_t1)     ] ||
  *             ||    [        yaw_t2 - proj(yaw_t1)       ] ||
  *             ||A * [      x_vel_t2 - proj(x_vel_t1)     ] ||
  *             ||    [      y_vel_t2 - proj(y_vel_t1)     ] ||
+ *             ||    [      z_vel_t2 - proj(z_vel_t1)     ] ||
  *             ||    [   roll_vel_t2 - proj(roll_vel_t1)  ] ||
  *             ||    [  pitch_vel_t2 - proj(pitch_vel_t1) ] ||
  *             ||    [    yaw_vel_t2 - proj(yaw_vel_t1)   ] ||
@@ -108,7 +108,7 @@ public:
    *
    * @param[in] dt The time delta across which to generate the kinematic model cost
    * @param[in] A The residual weighting matrix, most likely the square root information matrix in order
-   *              (x, y, z, qx, qy, qz, x_vel, y_vel, z_vel, roll_vel, pitch_vel, yaw_vel, x_acc, y_acc, z_acc)
+   *              (x, y, z, roll, pitch, yaw, x_vel, y_vel, z_vel, roll_vel, pitch_vel, yaw_vel, x_acc, y_acc, z_acc)
    */
   Unicycle3DStateCostFunction(const double dt, const fuse_core::Matrix15d& A);
 
@@ -181,16 +181,17 @@ public:
       acc_linear_pred[2],
       jacobians);
 
+    // Because the above function computes the jacobian wrt rpy orientation, it needs to be converted to
+    // quaternion orientation.
+    // This is still the case even although local parameterization is used because the jacobian matrix is the global
+    // size (so 15x4) and then later for optimization the jacobian internally gets updated with the jacobian of the
+    // transformation function from the global to the local size.
+    // See ceres 2.0.0: internal/ceres/residual_block.cc::143
+    // Also see: https://github.com/ceres-solver/ceres-solver/issues/387
     if (jacobians && jacobians[1])
     {
-      // Although local parameterization is used, the jacobian matrix is still the global size (so 15x4) and
-      // then later for optimization the jacobian internally gets updated with the jacobian of the transformation
-      // function from the global to the local size (see ceres 2.0.0: internal/ceres/residual_block.cc::143)
-      // Also see: https://github.com/ceres-solver/ceres-solver/issues/387
-
-      // Therefore we need to transform the roll, pitch, yaw orientation to quaternion space
-      // Note that this only works because jacobians[1] is originally 15x4 and the rpy jacobian
-      // is smaller (15x3) while vice versa a segfault might occur because of an out-of-bounds access
+      // Note that this only works without an out-of-bounds memory access because jacobians[1] is originally 15x4 and
+      // the rpy jacobian is smaller (15x3) while vice versa a segfault might occur because of an out-of-bounds access
       Eigen::Map<fuse_core::Matrix<double, 15, 3>> jacobian_orientation_rpy(jacobians[1]);
       Eigen::Map<fuse_core::Matrix<double, 15, 4>> jacobian_orientation_q(jacobians[1]);
 
@@ -255,7 +256,6 @@ public:
         // Also see: https://github.com/ceres-solver/ceres-solver/issues/387
 
         Eigen::Map<fuse_core::Matrix<double, 15, 4>> jacobian(jacobians[1]);
-
         jacobian.applyOnTheLeft(-A_);
       }
 

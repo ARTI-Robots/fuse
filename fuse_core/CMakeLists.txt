@@ -128,6 +128,22 @@ if(CATKIN_ENABLE_TESTING)
   find_package(rostest REQUIRED)
   find_package(geometry_msgs REQUIRED)
 
+  include(ExternalProject)
+  find_package(Git REQUIRED)
+
+  externalproject_add(
+    covariance_geometry_cpp
+    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/covariance_geometry_cpp
+    GIT_REPOSITORY https://github.com/ARTI-Robots/covariance_geometry.git
+    GIT_TAG master
+    TIMEOUT 10
+    UPDATE_COMMAND ${GIT_EXECUTABLE} pull
+    CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/covariance_geometry_cpp/src
+    LOG_DOWNLOAD ON
+  )
+
+  add_definitions(${EIGEN3_DEFINITIONS})
+
   # Lint tests
   set(ROSLINT_CPP_OPTS "--filter=-build/c++11,-runtime/references")
   roslint_cpp()
@@ -457,6 +473,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   add_dependencies(test_util
     ${catkin_EXPORTED_TARGETS}
+    covariance_geometry_cpp
   )
   target_include_directories(test_util
     PRIVATE
@@ -465,9 +482,11 @@ if(CATKIN_ENABLE_TESTING)
       ${catkin_INCLUDE_DIRS}
       ${CERES_INCLUDE_DIRS}
       ${EIGEN3_INCLUDE_DIRS}
+      ${CMAKE_CURRENT_BINARY_DIR}/covariance_geometry_cpp/src/include
   )
   target_link_libraries(test_util
     ${catkin_LIBRARIES}
+    ${CMAKE_CURRENT_BINARY_DIR}/covariance_geometry_cpp/src/lib/libcovariance_geometry_cpp.so
   )
   set_target_properties(test_util
     PROPERTIES

@@ -48,22 +48,26 @@ namespace fuse_constraints
 /**
  * @brief Implements a cost function that models a difference between 3D pose variables.
  *
- * A single pose involves two variables: a 3D position and a 3D orientation. This cost function computes the difference
- * using standard 3D transformation math:
+ * A single pose involves two variables: a 3D position and a 3D orientation. The generic NormalDelta cost function
+ * only supports a single variable type, and computes the difference using per-element subtraction. This cost function
+ * computes the difference using standard 3D transformation math.
  *
- *   cost(x) = || A * [ q1^-1 * (p2 - p1) - b(0:2) ] ||^2
- *             ||     [ (q1 - q2) - b(3:6)         ] ||
+ *             ||     [ delta.x(p1,p2)     - b(0)] ||^2
+ *             ||     [ delta.y(p1,p2)     - b(1)] ||
+ *   cost(x) = || A * [ delta.z(p1,p2)     - b(2)] ||
+ *             ||     [ delta.roll(q1,q2)  - b(3)] ||
+ *             ||     [ delta.pitch(q1,q2) - b(4)] ||
+ *             ||     [ delta.yaw(q1,q2)   - b(5)] ||
  *
- * where p1 and p2 are the position variables, q1 and q2 are the quaternion orientation variables, and the matrix A
- * and the vector b are fixed. In case the user is interested in implementing a cost function of
- * the form:
+ * Here, the matrix A can be of variable size, thereby permitting the computation of errors for partial measurements.
+ * The vector b is a fixed-size 6x1, p1 and p2 are the position variables, and q1 and q2 are the quaternion orientation
+ * variables. Note that the covariance submatrix for the quaternion is 3x3, representing errors in the orientation local
+ * parameterization tangent space. In case the user is interested in implementing a cost function of the form
  *
  *   cost(X) = (X - mu)^T S^{-1} (X - mu)
  *
  * where, mu is a vector and S is a covariance matrix, then, A = S^{-1/2}, i.e the matrix A is the square root
  * information matrix (the inverse of the covariance).
- *
- * Note that the cost function's quaternion components are only concerned with the imaginary components (qx, qy, qz).
  */
 class NormalDeltaPose3DEulerCostFunctor
 {
