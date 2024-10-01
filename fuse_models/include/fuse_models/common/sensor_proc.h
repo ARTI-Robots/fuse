@@ -433,10 +433,6 @@ inline bool processAbsolutePose3DWithCovariance(
     }
   }
 
-  // Convert the pose into tf2_2d transform
-  tf2_2d::Transform absolute_pose_2d;
-  tf2::fromMsg(transformed_message.pose.pose, absolute_pose_2d);
-
   // Create the pose variable
   auto position = fuse_variables::Position3DStamped::make_shared(pose.header.stamp, device_id);
   auto orientation = fuse_variables::Orientation3DStamped::make_shared(pose.header.stamp, device_id);

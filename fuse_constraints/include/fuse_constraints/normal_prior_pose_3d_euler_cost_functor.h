@@ -53,13 +53,13 @@ namespace fuse_constraints
  *
  * The cost function is of the form:
  *
- *   cost(x) = || A * [  p - b(0:2) ] ||^2
- *             ||     [  q - b(3:6) ] ||
+ *   cost(x) = || A * [  p                      - b(0:2) ] ||^2
+ *             ||     [  toEulerRollPitchYaw(q) - b(3:6) ] ||
  *
  * Here, the matrix A can be of variable size, thereby permitting the computation of errors for partial measurements.
  * The vector b is a fixed-size 6x1, p is the position variable, and q is the orientation variable.
- * Note that the covariance submatrix for the quaternion is 3x3, representing errors in the orientation local
- * parameterization tangent space. In case the user is interested in implementing a cost function of the form
+ * Note that the covariance submatrix for the orientation should represent errors in roll, pitch, and yaw.
+ * In case the user is interested in implementing a cost function of the form
  *
  *   cost(X) = (X - mu)^T S^{-1} (X - mu)
  *
@@ -77,7 +77,11 @@ public:
    * The residual weighting matrix can vary in size, as this cost functor can be used to compute costs for partial
    * vectors. The number of rows of A will be the number of dimensions for which you want to compute the error, and the
    * number of columns in A will be fixed at 6. For example, if we just want to use the values of x and yaw, then \p A
-   * will be of size 2x6.
+   * will be of size 2x6 where the first row represents the weighting for x to all dimensions including x itself and
+   * the second row represents the weighting for yaw to all dimensions including yaw itself. For weighting with 1 and
+   * no relation to other dimensions the matrix should be:
+   * [1, 0, 0, 0, 0, 0]
+   * [0, 0, 0, 0, 0, 1]
    *
    * @param[in] A The residual weighting matrix, most likely the square root information matrix in order
    *              (x, y, z, roll, pitch, yaw)

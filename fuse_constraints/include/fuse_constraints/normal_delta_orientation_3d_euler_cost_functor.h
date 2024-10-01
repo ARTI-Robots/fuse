@@ -42,6 +42,7 @@
 #include <ceres/rotation.h>
 #include <Eigen/Core>
 
+#include <stdexcept>
 #include <vector>
 
 
@@ -89,61 +90,14 @@ public:
    */
   NormalDeltaOrientation3DEulerCostFunctor(
     const fuse_core::MatrixXd& A,
-    const fuse_core::VectorXd& b,
-    const std::vector<Euler> &axes = {Euler::ROLL, Euler::PITCH, Euler::YAW}) :  //NOLINT
-      A_(A),
-      b_(b),
-      axes_(axes)
-  {
-  }
+    const fuse_core::Vector3d& b,
+    const std::vector<Euler> &axes = {Euler::ROLL, Euler::PITCH, Euler::YAW});
 
   /**
    * @brief Evaluate the cost function. Used by the Ceres optimization engine.
    */
   template <typename T>
-  bool operator()(const T* const orientation1, const T* const orientation2, T* residuals) const
-  {
-    using fuse_variables::Orientation3DStamped;
-
-    for (size_t i = 0; i < axes_.size(); ++i)
-    {
-      T angle1, angle2;
-      switch (axes_[i])
-      {
-        case Euler::ROLL:
-        {
-          angle1 = fuse_core::getRoll(orientation1[0], orientation1[1], orientation1[2], orientation1[3]);
-          angle2 = fuse_core::getRoll(orientation2[0], orientation2[1], orientation2[2], orientation2[3]);
-          break;
-        }
-        case Euler::PITCH:
-        {
-          angle1 = fuse_core::getPitch(orientation1[0], orientation1[1], orientation1[2], orientation1[3]);
-          angle2 = fuse_core::getPitch(orientation2[0], orientation2[1], orientation2[2], orientation2[3]);
-          break;
-        }
-        case Euler::YAW:
-        {
-          angle1 = fuse_core::getYaw(orientation1[0], orientation1[1], orientation1[2], orientation1[3]);
-          angle2 = fuse_core::getYaw(orientation2[0], orientation2[1], orientation2[2], orientation2[3]);
-          break;
-        }
-        default:
-        {
-          throw std::runtime_error("The provided axis specified is unknown. "
-                                   "I should probably be more informative here");
-        }
-      }
-      const auto difference = fuse_core::wrapAngle2D(angle2 - angle1);
-      residuals[i] = fuse_core::wrapAngle2D(difference - T(b_[i]));
-    }
-
-    // Scale the residuals by the square root information matrix to account for the measurement uncertainty.
-    Eigen::Map<Eigen::Matrix<T, Eigen::Dynamic, 1>> residuals_map(residuals, A_.rows());
-    residuals_map.applyOnTheLeft(A_.template cast<T>());
-
-    return true;
-  }
+  bool operator()(const T* const orientation1, const T* const orientation2, T* residuals) const;
 
 private:
   fuse_core::MatrixXd A_;  //!< The residual weighting matrix, most likely the square root information matrix
@@ -151,6 +105,74 @@ private:
                            //!< the values in \p axes.
   std::vector<Euler> axes_;  //!< The Euler angle axes that we're measuring
 };
+
+NormalDeltaOrientation3DEulerCostFunctor::NormalDeltaOrientation3DEulerCostFunctor(
+  const fuse_core::MatrixXd& A,
+  const fuse_core::Vector3d& b,
+  const std::vector<Euler> &axes) :
+    A_(A),
+    b_(b),
+    axes_(axes)
+{
+  if (A_.cols() != b_.size())
+  {
+    throw std::invalid_argument("The number of columns in the residual weighting matrix A need to match the size of "
+                                "the measured difference b.");
+  }
+  if (A_.rows() != static_cast<Eigen::Index>(axes_.size()))
+  {
+    throw std::invalid_argument("The number of rows in the residual weighting matrix A need to match the size of "
+                                "the desired Euler angle axes.");
+  }
+}
+
+template <typename T>
+bool NormalDeltaOrientation3DEulerCostFunctor::operator()(
+  const T* const orientation1,
+  const T* const orientation2,
+  T* residuals) const
+{
+  using fuse_variables::Orientation3DStamped;
+
+  for (size_t i = 0; i < axes_.size(); ++i)
+  {
+    T angle1, angle2;
+    switch (axes_[i])
+    {
+      case Euler::ROLL:
+      {
+        angle1 = fuse_core::getRoll(orientation1[0], orientation1[1], orientation1[2], orientation1[3]);
+        angle2 = fuse_core::getRoll(orientation2[0], orientation2[1], orientation2[2], orientation2[3]);
+        break;
+      }
+      case Euler::PITCH:
+      {
+        angle1 = fuse_core::getPitch(orientation1[0], orientation1[1], orientation1[2], orientation1[3]);
+        angle2 = fuse_core::getPitch(orientation2[0], orientation2[1], orientation2[2], orientation2[3]);
+        break;
+      }
+      case Euler::YAW:
+      {
+        angle1 = fuse_core::getYaw(orientation1[0], orientation1[1], orientation1[2], orientation1[3]);
+        angle2 = fuse_core::getYaw(orientation2[0], orientation2[1], orientation2[2], orientation2[3]);
+        break;
+      }
+      default:
+      {
+        throw std::runtime_error("The provided axis specified is unknown. "
+                                  "I should probably be more informative here");
+      }
+    }
+    const auto difference = fuse_core::wrapAngle2D(angle2 - angle1);
+    residuals[i] = fuse_core::wrapAngle2D(difference - T(b_[i]));
+  }
+
+  // Scale the residuals by the square root information matrix to account for the measurement uncertainty.
+  Eigen::Map<Eigen::Matrix<T, Eigen::Dynamic, 1>> residuals_map(residuals, A_.rows());
+  residuals_map.applyOnTheLeft(A_.template cast<T>());
+
+  return true;
+}
 
 }  // namespace fuse_constraints
 

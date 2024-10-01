@@ -40,6 +40,7 @@
 #include <fuse_core/util.h>
 
 #include <ceres/rotation.h>
+#include <stdexcept>
 
 
 namespace fuse_constraints
@@ -61,8 +62,8 @@ namespace fuse_constraints
  *
  * Here, the matrix A can be of variable size, thereby permitting the computation of errors for partial measurements.
  * The vector b is a fixed-size 6x1, p1 and p2 are the position variables, and q1 and q2 are the quaternion orientation
- * variables. Note that the covariance submatrix for the quaternion is 3x3, representing errors in the orientation local
- * parameterization tangent space. In case the user is interested in implementing a cost function of the form
+ * variables. Note that the covariance submatrix for the orientation should represent errors in roll, pitch, and yaw.
+ * In case the user is interested in implementing a cost function of the form
  *
  *   cost(X) = (X - mu)^T S^{-1} (X - mu)
  *
@@ -80,7 +81,11 @@ public:
    * The residual weighting matrix can vary in size, as this cost functor can be used to compute costs for partial
    * vectors. The number of rows of A will be the number of dimensions for which you want to compute the error, and the
    * number of columns in A will be fixed at 6. For example, if we just want to use the values of x and yaw, then \p A
-   * will be of size 2x6.
+   * will be of size 2x6 where the first row represents the weighting for x to all dimensions including x itself and
+   * the second row represents the weighting for yaw to all dimensions including yaw itself. For weighting with 1 and
+   * no relation to other dimensions the matrix should be:
+   * [1, 0, 0, 0, 0, 0]
+   * [0, 0, 0, 0, 0, 1]
    *
    * @param[in] A The residual weighting matrix, most likely the square root information matrix in order
    *              (dx, dy, dz, droll, dpitch, dyaw)
@@ -112,7 +117,15 @@ NormalDeltaPose3DEulerCostFunctor::NormalDeltaPose3DEulerCostFunctor(
     A_(A),
     b_(b),
     orientation_functor_(fuse_core::Matrix3d::Identity(), b_.tail<3>())  // Orientation residuals will not be scaled
+                                                                         // within the orientation functor but here at
+                                                                         // the cost function after computation of the
+                                                                         // orientation residuals without scaling.
 {
+  if (A.cols() != b.size())
+  {
+    throw std::invalid_argument("The number of columns in the residual weighting matrix A need to match the size of "
+                                "the measured difference b.");
+  }
 }
 
 template <typename T>

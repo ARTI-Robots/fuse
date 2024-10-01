@@ -98,7 +98,7 @@ std::enable_if_t<is_linear_2d<T>::value, size_t> toIndex(const std::string& dime
 /**
  * @brief Method that converts from 3D linear axis dimension names to index values
  *
- * This method is enabled only for variables that contain _only_ 2D linear quantities
+ * This method is enabled only for variables that contain _only_ 3D linear quantities
  *
  * @param[in] dimension - The dimension name to convert
  * @return the index of the enumerated dimension for that type

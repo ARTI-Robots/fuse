@@ -60,15 +60,15 @@ RelativePose3DStampedEulerConstraint::RelativePose3DStampedEulerConstraint(
       source,
       {position1.uuid(), orientation1.uuid(), position2.uuid(), orientation2.uuid()})  // NOLINT(whitespace/braces)
 {
-  size_t total_variable_size = 6;  // 3 position (x, y, z) and 3 orientation variables (roll, pitch, yaw)
-  size_t total_indices = linear_indices.size() + angular_indices.size();
+  constexpr size_t total_variable_size = 6;  // 3 position (x, y, z) and 3 orientation variables (roll, pitch, yaw)
+  const size_t total_indices = linear_indices.size() + angular_indices.size();
 
   assert(partial_delta.rows() == static_cast<int>(total_indices));
   assert(partial_covariance.rows() == static_cast<int>(total_indices));
   assert(partial_covariance.cols() == static_cast<int>(total_indices));
 
   // Compute the sqrt information of the provided cov matrix
-  fuse_core::MatrixXd partial_sqrt_information = partial_covariance.inverse().llt().matrixU();
+  const fuse_core::MatrixXd partial_sqrt_information = partial_covariance.inverse().llt().matrixU();
 
   // Assemble a mean vector and sqrt information matrix from the provided values, but in proper variable order
   // What are we doing here?
