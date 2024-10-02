@@ -86,14 +86,20 @@ add_library(${PROJECT_NAME}
   src/acceleration_2d.cpp
   src/graph_ignition.cpp
   src/imu_2d.cpp
+  src/imu_3d.cpp
   src/odometry_2d.cpp
+  src/odometry_3d.cpp
   src/odometry_2d_publisher.cpp
+  src/odometry_3d_publisher.cpp
   src/pose_2d.cpp
   src/transaction.cpp
   src/twist_2d.cpp
   src/unicycle_2d.cpp
   src/unicycle_2d_ignition.cpp
   src/unicycle_2d_state_kinematic_constraint.cpp
+  src/unicycle_3d.cpp
+  src/unicycle_3d_ignition.cpp
+  src/unicycle_3d_state_kinematic_constraint.cpp
 )
 add_dependencies(${PROJECT_NAME}
   ${${PROJECT_NAME}_EXPORTED_TARGETS}
@@ -113,7 +119,7 @@ target_link_libraries(${PROJECT_NAME}
 )
 set_target_properties(${PROJECT_NAME}
   PROPERTIES
-    CXX_STANDARD 14
+    CXX_STANDARD 17
     CXX_STANDARD_REQUIRED YES
 )
 
@@ -165,7 +171,22 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_unicycle_2d
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
+      CXX_STANDARD_REQUIRED YES
+  )
+
+  add_rostest_gtest(
+    test_unicycle_3d
+    test/unicycle_3d.test
+    test/test_unicycle_3d.cpp
+  )
+  target_link_libraries(test_unicycle_3d
+    ${PROJECT_NAME}
+    ${catkin_LIBRARIES}
+  )
+  set_target_properties(test_unicycle_3d
+    PROPERTIES
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -181,7 +202,22 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_unicycle_2d_predict
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
+      CXX_STANDARD_REQUIRED YES
+  )
+
+  catkin_add_gtest(
+    test_unicycle_3d_predict
+    test/test_unicycle_3d_predict.cpp
+  )
+  target_link_libraries(test_unicycle_3d_predict
+    ${PROJECT_NAME}
+    ${catkin_LIBRARIES}
+    ${CERES_LIBRARIES}
+  )
+  set_target_properties(test_unicycle_3d_predict
+    PROPERTIES
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -198,7 +234,23 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_unicycle_2d_state_cost_function
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
+      CXX_STANDARD_REQUIRED YES
+  )
+
+  catkin_add_gtest(
+    test_unicycle_3d_state_cost_function
+    test/test_unicycle_3d_state_cost_function.cpp
+  )
+  target_link_libraries(
+    test_unicycle_3d_state_cost_function
+    ${PROJECT_NAME}
+    ${catkin_LIBRARIES}
+    ${CERES_LIBRARIES}
+  )
+  set_target_properties(test_unicycle_3d_state_cost_function
+    PROPERTIES
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -224,7 +276,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_graph_ignition
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -240,7 +292,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_unicycle_2d_ignition
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -255,7 +307,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_sensor_proc
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -276,7 +328,7 @@ if(CATKIN_ENABLE_TESTING)
       )
       set_target_properties(benchmark_unicycle_2d_state_cost_function
         PROPERTIES
-          CXX_STANDARD 14
+          CXX_STANDARD 17
           CXX_STANDARD_REQUIRED YES
       )
     endif()

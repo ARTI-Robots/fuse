@@ -72,7 +72,7 @@ target_link_libraries(${PROJECT_NAME}
 )
 set_target_properties(${PROJECT_NAME}
   PROPERTIES
-    CXX_STANDARD 14
+    CXX_STANDARD 17
     CXX_STANDARD_REQUIRED YES
 )
 
@@ -94,7 +94,7 @@ target_link_libraries(fuse_echo
 )
 set_target_properties(fuse_echo
   PROPERTIES
-    CXX_STANDARD 14
+    CXX_STANDARD 17
     CXX_STANDARD_REQUIRED YES
 )
 
@@ -126,6 +126,23 @@ install(
 if(CATKIN_ENABLE_TESTING)
   find_package(roslint REQUIRED)
   find_package(rostest REQUIRED)
+  find_package(geometry_msgs REQUIRED)
+
+  include(ExternalProject)
+  find_package(Git REQUIRED)
+
+  externalproject_add(
+    covariance_geometry_cpp
+    PREFIX ${CMAKE_CURRENT_BINARY_DIR}/covariance_geometry_cpp
+    GIT_REPOSITORY https://github.com/ARTI-Robots/covariance_geometry.git
+    GIT_TAG master
+    TIMEOUT 10
+    UPDATE_COMMAND ${GIT_EXECUTABLE} pull
+    CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/covariance_geometry_cpp/src
+    LOG_DOWNLOAD ON
+  )
+
+  add_definitions(${EIGEN3_DEFINITIONS})
 
   # Lint tests
   set(ROSLINT_CPP_OPTS "--filter=-build/c++11,-runtime/references")
@@ -154,7 +171,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_async_motion_model
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -180,7 +197,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_async_publisher
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -206,7 +223,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_async_sensor_model
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -231,7 +248,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_callback_wrapper
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -256,7 +273,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_constraint
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -281,7 +298,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_eigen
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -298,7 +315,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_local_parameterization
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -323,7 +340,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_loss
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -347,7 +364,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_message_buffer
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -373,7 +390,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_timestamp_manager
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -399,7 +416,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_transaction
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -424,7 +441,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_parameter
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -438,9 +455,15 @@ if(CATKIN_ENABLE_TESTING)
     ${PROJECT_NAME}
     ${catkin_LIBRARIES}
   )
+  target_include_directories(test_throttled_callback
+    PRIVATE
+      include
+      ${catkin_INCLUDE_DIRS}
+      ${geometry_msgs_INCLUDE_DIRS}
+  )
   set_target_properties(test_throttled_callback
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -450,6 +473,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   add_dependencies(test_util
     ${catkin_EXPORTED_TARGETS}
+    covariance_geometry_cpp
   )
   target_include_directories(test_util
     PRIVATE
@@ -458,13 +482,15 @@ if(CATKIN_ENABLE_TESTING)
       ${catkin_INCLUDE_DIRS}
       ${CERES_INCLUDE_DIRS}
       ${EIGEN3_INCLUDE_DIRS}
+      ${CMAKE_CURRENT_BINARY_DIR}/covariance_geometry_cpp/src/include
   )
   target_link_libraries(test_util
     ${catkin_LIBRARIES}
+    ${CMAKE_CURRENT_BINARY_DIR}/covariance_geometry_cpp/src/lib/libcovariance_geometry_cpp.so
   )
   set_target_properties(test_util
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -489,7 +515,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_uuid
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 
@@ -514,7 +540,7 @@ if(CATKIN_ENABLE_TESTING)
   )
   set_target_properties(test_variable
     PROPERTIES
-      CXX_STANDARD 14
+      CXX_STANDARD 17
       CXX_STANDARD_REQUIRED YES
   )
 endif()

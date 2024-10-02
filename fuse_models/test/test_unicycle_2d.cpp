@@ -63,7 +63,7 @@ TEST(Unicycle2D, UpdateStateHistoryEstimates)
   auto linear_acceleration1 = fuse_variables::AccelerationLinear2DStamped::make_shared(ros::Time(1, 0));
   position1->x() = 1.1;
   position1->y() = 2.1;
-  yaw1->yaw() = 3.1;
+  yaw1->setYaw(3.1);
   linear_velocity1->x() = 1.0;
   linear_velocity1->y() = 0.0;
   yaw_velocity1->yaw() = 0.0;
@@ -76,7 +76,7 @@ TEST(Unicycle2D, UpdateStateHistoryEstimates)
   auto linear_acceleration2 = fuse_variables::AccelerationLinear2DStamped::make_shared(ros::Time(2, 0));
   position2->x() = 1.2;
   position2->y() = 2.2;
-  yaw2->yaw() = M_PI / 2.0;
+  yaw2->setYaw(M_PI / 2.0);
   linear_velocity2->x() = 0.0;
   linear_velocity2->y() = 1.0;
   yaw_velocity2->yaw() = 0.0;
@@ -89,7 +89,7 @@ TEST(Unicycle2D, UpdateStateHistoryEstimates)
   auto linear_acceleration3 = fuse_variables::AccelerationLinear2DStamped::make_shared(ros::Time(3, 0));
   position3->x() = 1.3;
   position3->y() = 2.3;
-  yaw3->yaw() = 3.3;
+  yaw3->setYaw(3.3);
   linear_velocity3->x() = 4.3;
   linear_velocity3->y() = 5.3;
   yaw_velocity3->yaw() = 6.3;
@@ -102,7 +102,7 @@ TEST(Unicycle2D, UpdateStateHistoryEstimates)
   auto linear_acceleration4 = fuse_variables::AccelerationLinear2DStamped::make_shared(ros::Time(4, 0));
   position4->x() = 1.4;
   position4->y() = 2.4;
-  yaw4->yaw() = 3.4;
+  yaw4->setYaw(3.4);
   linear_velocity4->x() = 4.4;
   linear_velocity4->y() = 5.4;
   yaw_velocity4->yaw() = 6.4;
@@ -115,7 +115,7 @@ TEST(Unicycle2D, UpdateStateHistoryEstimates)
   auto linear_acceleration5 = fuse_variables::AccelerationLinear2DStamped::make_shared(ros::Time(5, 0));
   position5->x() = 1.5;
   position5->y() = 2.5;
-  yaw5->yaw() = 3.5;
+  yaw5->setYaw(3.5);
   linear_velocity5->x() = 4.5;
   linear_velocity5->y() = 5.5;
   yaw_velocity5->yaw() = 6.5;
@@ -326,7 +326,7 @@ TEST(Unicycle2D, generateMotionModel)
   auto linear_acceleration1 = fuse_variables::AccelerationLinear2DStamped::make_shared(ros::Time(1, 0));
   position1->x() = 1.1;
   position1->y() = 2.1;
-  yaw1->yaw() = 1.2;
+  yaw1->setYaw(1.2);
   linear_velocity1->x() = 1.0;
   linear_velocity1->y() = 0.0;
   yaw_velocity1->yaw() = 0.0;
@@ -345,7 +345,7 @@ TEST(Unicycle2D, generateMotionModel)
       linear_velocity1->uuid(),
       yaw_velocity1->uuid(),
       linear_acceleration1->uuid(),
-      tf2_2d::Transform(position1->x(), position1->y(), yaw1->yaw()),
+      tf2_2d::Transform(position1->x(), position1->y(), yaw1->getYaw()),
       tf2_2d::Vector2(linear_velocity1->x(), linear_velocity1->y()),
       yaw_velocity1->yaw(),
       tf2_2d::Vector2(linear_acceleration1->x(), linear_acceleration1->y())});  // NOLINT(whitespace/braces)
@@ -380,14 +380,14 @@ TEST(Unicycle2D, generateMotionModel)
     auto velocity_yaw = std::static_pointer_cast<fuse_variables::VelocityAngular2DStamped>(variables.at(3));
     auto acceleration_linear = std::static_pointer_cast<fuse_variables::AccelerationLinear2DStamped>(variables.at(4));
 
-    auto expected_pose = tf2_2d::Transform(position1->x(), position1->y(), yaw1->yaw());
+    auto expected_pose = tf2_2d::Transform(position1->x(), position1->y(), yaw1->getYaw());
     auto expected_linear_velocity = tf2_2d::Vector2(linear_velocity1->x(), linear_velocity1->y());
     auto expected_yaw_velocity = yaw_velocity1->yaw();
     auto expected_linear_acceleration = tf2_2d::Vector2(linear_acceleration1->x(), linear_acceleration1->y());
 
     EXPECT_EQ(position->x(), expected_pose.x());
     EXPECT_EQ(position->y(), expected_pose.y());
-    EXPECT_EQ(orientation->yaw(), expected_pose.yaw());
+    EXPECT_EQ(orientation->getYaw(), expected_pose.getYaw());
 
     EXPECT_EQ(velocity_linear->x(), expected_linear_velocity.x());
     EXPECT_EQ(velocity_linear->y(), expected_linear_velocity.y());
@@ -414,7 +414,7 @@ TEST(Unicycle2D, generateMotionModel)
 
     EXPECT_NEAR(position->x(), expected_pose.x(), 1.0e-9);
     EXPECT_NEAR(position->y(), expected_pose.y(), 1.0e-9);
-    EXPECT_NEAR(orientation->yaw(), expected_pose.yaw(), 1.0e-9);
+    EXPECT_NEAR(orientation->getYaw(), expected_pose.getYaw(), 1.0e-9);
 
     EXPECT_NEAR(velocity_linear->x(), expected_linear_velocity.x(), 1.0e-9);
     EXPECT_NEAR(velocity_linear->y(), expected_linear_velocity.y(), 1.0e-9);
