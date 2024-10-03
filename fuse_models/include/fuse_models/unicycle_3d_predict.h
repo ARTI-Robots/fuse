@@ -666,13 +666,16 @@ inline void predict(
     acc_linear_z_pred,
     jacobians.data());
 
-  pose2.setOrigin(tf2::Vector3{x_pred, y_pred, z_pred});
+  pose2.setOrigin(tf2::Vector3{x_pred, y_pred, z_pred});  // NOLINT(whitespace/braces)
 
   Eigen::Quaterniond orientation2 = Eigen::AngleAxisd(yaw_pred, Eigen::Vector3d::UnitZ()) *
                                     Eigen::AngleAxisd(pitch_pred, Eigen::Vector3d::UnitY()) *
                                     Eigen::AngleAxisd(roll_pred, Eigen::Vector3d::UnitX());
 
-  pose2.setRotation({orientation2.x(), orientation2.y(), orientation2.z(), orientation2.w()});
+  pose2.setRotation({orientation2.x(),  // NOLINT(whitespace/braces)
+                     orientation2.y(),
+                     orientation2.z(),
+                     orientation2.w()});  // NOLINT(whitespace/braces)
 
   vel_linear2.setX(vel_linear_x_pred);
   vel_linear2.setY(vel_linear_y_pred);
@@ -776,7 +779,7 @@ inline void predict(
     acc_linear_y_pred,
     acc_linear_z_pred);
 
-  pose2.setOrigin(tf2::Vector3{x_pred, y_pred, z_pred});
+  pose2.setOrigin(tf2::Vector3{x_pred, y_pred, z_pred});  // NOLINT(whitespace/braces)
 
   Eigen::Quaterniond orientation_pred_q =
     Eigen::AngleAxisd(yaw_pred, Eigen::Vector3d::UnitZ()) *

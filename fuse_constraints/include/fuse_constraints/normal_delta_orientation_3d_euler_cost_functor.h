@@ -91,7 +91,7 @@ public:
   NormalDeltaOrientation3DEulerCostFunctor(
     const fuse_core::MatrixXd& A,
     const fuse_core::Vector3d& b,
-    const std::vector<Euler> &axes = {Euler::ROLL, Euler::PITCH, Euler::YAW});
+    const std::vector<Euler> &axes = {Euler::ROLL, Euler::PITCH, Euler::YAW});  // NOLINT(whitespace/braces)
 
   /**
    * @brief Evaluate the cost function. Used by the Ceres optimization engine.

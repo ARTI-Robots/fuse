@@ -237,7 +237,7 @@ std::vector<fuse_variables::Orientation3DStamped::Euler> toEulerEnumVector(const
   euler_indices.reserve(indices.size());
 
   std::transform(indices.begin(), indices.end(), std::back_inserter(euler_indices),
-                 [](int value) { return static_cast<Euler>(value + 4U); });
+                 [](int value) { return static_cast<Euler>(value + 4U); });  // NOLINT(whitespace/braces)
 
   return euler_indices;
 }

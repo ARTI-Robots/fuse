@@ -162,8 +162,8 @@ TEST(Predict, predictDirectVals)
   EXPECT_DOUBLE_EQ(0.0, acc_linear2.z());
 
   // Out of plane motion
-  pose1.setOrigin({0.0, 0.0, 0.0});
-  pose1.setRotation({ 0.0, 0.0, 0.0, 1.0});
+  pose1.setOrigin({0.0, 0.0, 0.0});  // NOLINT(whitespace/braces)
+  pose1.setRotation({ 0.0, 0.0, 0.0, 1.0});  // NOLINT(whitespace/braces)
   vel_linear1 = {0.0, 0.0, 0.1};
   vel_angular1 = {1.570796327, 0.0, 0.0};
   acc_linear1 = {0.0, 0.0, 1.0};
@@ -199,8 +199,8 @@ TEST(Predict, predictDirectVals)
   EXPECT_DOUBLE_EQ(1.0, acc_linear2.z());
 
   // General 3D motion (these value are checked against rl predict() equations)
-  pose1.setOrigin({0.0, 0.0, 0.0});
-  pose1.setRotation({-0.003, -0.943, 0.314, 0.110});  // RPY {-2.490, -0.206, 3.066}
+  pose1.setOrigin({0.0, 0.0, 0.0});  // NOLINT(whitespace/braces)
+  pose1.setRotation({-0.003, -0.943, 0.314, 0.110});  // RPY {-2.490, -0.206, 3.066} NOLINT(whitespace/braces)
   vel_linear1 = {0.1, 0.2, 0.1};
   vel_angular1 = {1.570796327, 1.570796327, -1.570796327};
   acc_linear1 = {-0.5, 1.0, 1.0};
