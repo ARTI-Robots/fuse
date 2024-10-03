@@ -158,7 +158,7 @@ if(CATKIN_ENABLE_TESTING)
   )
 
   # Optimizer Tests
-  add_rostest_gtest(test_optimizer
+  catkin_add_executable_with_gtest(test_optimizer
     test/optimizer.test
     test/test_optimizer.cpp
   )
@@ -182,6 +182,7 @@ if(CATKIN_ENABLE_TESTING)
   )
 
   add_rostest(test/optimizer.test ARGS config:=list DEPENDENCIES test_optimizer)
+  add_rostest(test/optimizer.test ARGS config:=struct DEPENDENCIES test_optimizer)
 
   # Fixed-lag Ignition test
   add_rostest_gtest(test_fixed_lag_ignition
