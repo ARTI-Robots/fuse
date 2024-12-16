@@ -131,6 +131,8 @@ if(CATKIN_ENABLE_TESTING)
   include(ExternalProject)
   find_package(Git REQUIRED)
 
+  set(FUSE_CORE_UPDATE_DISCONNECTED ON CACHE BOOL "Set to OFF to force check for updates of covariance_geometry_cpp")
+
   externalproject_add(
     covariance_geometry_cpp
     PREFIX ${CMAKE_CURRENT_BINARY_DIR}/covariance_geometry_cpp
@@ -138,6 +140,7 @@ if(CATKIN_ENABLE_TESTING)
     GIT_TAG master
     TIMEOUT 10
     UPDATE_COMMAND ${GIT_EXECUTABLE} pull
+    UPDATE_DISCONNECTED ${FUSE_CORE_UPDATE_DISCONNECTED}
     CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${CMAKE_CURRENT_BINARY_DIR}/covariance_geometry_cpp/src
     LOG_DOWNLOAD ON
   )
