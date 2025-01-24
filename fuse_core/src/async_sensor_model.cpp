@@ -132,14 +132,7 @@ void AsyncSensorModel::stop()
 
   if (active_)
   {
-    // the sensor should be active so do not stop the sensor
-
-    if (ros::ok())
-    {
-      publishSensorsEnabled();
-    }
-
-    return;
+    active_ = false;
   }
 
   if (ros::ok())
@@ -161,6 +154,8 @@ void AsyncSensorModel::stop()
 
 bool AsyncSensorModel::enableSensorCallback(std_srvs::SetBoolRequest& request, std_srvs::SetBoolResponse& response)
 {
+  ROS_INFO_STREAM("enable sensor: '" << name_ << "' called with: " << static_cast<int>(request.data));
+
   response.success = false;
 
   std::lock_guard<std::mutex> lock(start_stop_mutex_);

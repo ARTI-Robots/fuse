@@ -59,7 +59,7 @@ class MySensor : public fuse_core::AsyncSensorModel
 public:
   MySensor() :
     fuse_core::AsyncSensorModel(1),
-    initialized(false)
+    initialized(false), start_count_(0), stop_count_(0)
   {
   }
 
@@ -76,8 +76,20 @@ public:
     graph_received = true;
   }
 
+  void onStart() override
+  {
+    start_count_++;
+  }
+
+  void onStop() override
+  {
+    stop_count_++;
+  }
+
   bool graph_received;
   bool initialized;
+  uint32_t start_count_;
+  uint32_t stop_count_;
 };
 
 TEST(AsyncSensorModel, OnInit)
@@ -116,6 +128,110 @@ TEST(AsyncSensorModel, SendTransaction)
   fuse_core::Transaction::SharedPtr transaction;  // nullptr, okay because we don't actually use it for anything
   sensor.sendTransaction(transaction);
   EXPECT_TRUE(received_transaction);
+}
+
+TEST(AsyncSensorModel, StartAndStop)
+{
+  MySensor sensor;
+  std::string name ="my_sensor";
+  ros::NodeHandle private_node_handle = ros::NodeHandle("~/" + name);
+  private_node_handle.deleteParam("auto_enabled");
+
+  sensor.initialize("my_sensor", &transactionCallback);
+
+  EXPECT_EQ(sensor.start_count_, 0);
+  EXPECT_EQ(sensor.stop_count_, 0);
+
+  sensor.start();
+  EXPECT_EQ(sensor.start_count_, 1);
+  EXPECT_EQ(sensor.stop_count_, 0);
+
+  sensor.stop();
+  EXPECT_EQ(sensor.start_count_, 1);
+  EXPECT_EQ(sensor.stop_count_, 1);
+}
+
+TEST(AsyncSensorModel, EnableAndDisableService)
+{
+  MySensor sensor;
+  std::string name ="my_sensor";
+  ros::NodeHandle private_node_handle = ros::NodeHandle("~/" + name);
+  private_node_handle.deleteParam("auto_enabled");
+
+  sensor.initialize("my_sensor", &transactionCallback);
+
+  ros::ServiceClient enable_sensor_client = private_node_handle.serviceClient<std_srvs::SetBool>("enable_sensor");
+  ros::spinOnce();
+
+  EXPECT_TRUE(enable_sensor_client.exists());
+
+  EXPECT_EQ(sensor.start_count_, 0);
+  EXPECT_EQ(sensor.stop_count_, 0);
+
+  sensor.start();
+  EXPECT_EQ(sensor.start_count_, 1);
+  EXPECT_EQ(sensor.stop_count_, 0);
+
+  std_srvs::SetBool::Request enable_request;
+  std_srvs::SetBool::Request enable_response;
+  bool call_result;
+
+  enable_request.data = static_cast<uint8_t>(false);
+  call_result = enable_sensor_client.call(enable_request, enable_response);
+  EXPECT_TRUE(call_result);
+  EXPECT_TRUE(enable_response.data);
+  ros::Duration(0.1).sleep();
+
+  EXPECT_EQ(sensor.start_count_, 1);
+  EXPECT_EQ(sensor.stop_count_, 1);
+
+  enable_request.data = static_cast<uint8_t>(false);
+  call_result = enable_sensor_client.call(enable_request, enable_response);
+  EXPECT_TRUE(call_result);
+  EXPECT_FALSE(enable_response.data);
+  ros::Duration(0.1).sleep();
+
+  EXPECT_EQ(sensor.start_count_, 1);
+  EXPECT_EQ(sensor.stop_count_, 1);
+
+  enable_request.data = static_cast<uint8_t>(true);
+  call_result = enable_sensor_client.call(enable_request, enable_response);
+  EXPECT_TRUE(call_result);
+  EXPECT_TRUE(enable_response.data);
+  ros::Duration(0.1).sleep();
+
+  EXPECT_EQ(sensor.start_count_, 2);
+  EXPECT_EQ(sensor.stop_count_, 1);
+
+  enable_request.data = static_cast<uint8_t>(true);
+  call_result = enable_sensor_client.call(enable_request, enable_response);
+  EXPECT_TRUE(call_result);
+  EXPECT_FALSE(enable_response.data);
+  ros::Duration(0.1).sleep();
+
+  EXPECT_EQ(sensor.start_count_, 2);
+  EXPECT_EQ(sensor.stop_count_, 1);
+}
+
+TEST(AsyncSensorModel, DisableAutoEnabled)
+{
+  MySensor sensor;
+  std::string name ="my_sensor";
+
+  ros::NodeHandle private_node_handle = ros::NodeHandle("~/" + name);
+  private_node_handle.setParam("auto_enabled", false);
+
+  sensor.initialize("my_sensor", &transactionCallback);
+  ros::spinOnce();
+
+  EXPECT_EQ(sensor.start_count_, 0);
+  EXPECT_EQ(sensor.stop_count_, 0);
+
+  sensor.start();
+  EXPECT_EQ(sensor.start_count_, 0);
+  EXPECT_EQ(sensor.stop_count_, 0);
+
+  private_node_handle.deleteParam("auto_enabled");
 }
 
 int main(int argc, char** argv)
