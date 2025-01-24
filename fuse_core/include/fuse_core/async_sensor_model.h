@@ -44,7 +44,11 @@
 
 #include <functional>
 #include <string>
-
+#include <std_srvs/SetBool.h>
+#include <mutex>
+#include <condition_variable>
+#include <thread>
+#include <std_msgs/Bool.h>
 
 namespace fuse_core
 {
@@ -92,7 +96,7 @@ public:
   /**
    * @brief Destructor
    */
-  virtual ~AsyncSensorModel() = default;
+  virtual ~AsyncSensorModel();
 
   /**
    * @brief Function to be executed whenever the optimizer has completed a Graph update
@@ -181,6 +185,22 @@ protected:
   ros::AsyncSpinner spinner_;  //!< A single/multi-threaded spinner assigned to the local callback queue
   TransactionCallback transaction_callback_;  //!< The function to be executed every time a Transaction is "published"
 
+  bool active_;
+  ros::ServiceServer enabled_service_server_;
+  std::thread start_stop_thread_;
+  std::mutex start_stop_mutex_;
+  std::condition_variable start_stop_condition_;
+  enum class StartStopEnum : uint8_t
+  {
+    START_SENSOR,
+    STOP_SENSOR,
+    KEEP_SENSOR_STATE,
+    STOP_THREAD
+  };
+  StartStopEnum start_stop_request_ = StartStopEnum::KEEP_SENSOR_STATE;
+
+  ros::Publisher sensor_enabled_pub_;
+
   /**
    * @brief Constructor
    *
@@ -235,6 +255,13 @@ protected:
    * The sensor model must not send any transactions to the optimizer after stop() is called.
    */
   virtual void onStop() {}
+
+  bool enableSensorCallback(std_srvs::SetBoolRequest& request, std_srvs::SetBoolResponse& response);
+
+  void startStopThreadLoop();
+
+  void publishSensorsEnabled();
+
 };
 
 }  // namespace fuse_core

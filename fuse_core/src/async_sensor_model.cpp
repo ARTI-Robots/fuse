@@ -50,8 +50,21 @@ namespace fuse_core
 
 AsyncSensorModel::AsyncSensorModel(size_t thread_count) :
   name_("uninitialized"),
-  spinner_(thread_count, &callback_queue_)
+  spinner_(thread_count, &callback_queue_), active_(true)
 {
+}
+
+AsyncSensorModel::~AsyncSensorModel()
+{
+  if (start_stop_thread_.joinable())
+  {
+    {
+      std::lock_guard<std::mutex> lock(start_stop_mutex_);
+      start_stop_request_ = StartStopEnum::STOP_THREAD;
+      start_stop_condition_.notify_all();
+    }
+    start_stop_thread_.join();
+  }
 }
 
 void AsyncSensorModel::graphCallback(Graph::ConstSharedPtr graph)
@@ -72,6 +85,15 @@ void AsyncSensorModel::initialize(
   private_node_handle_.setCallbackQueue(&callback_queue_);
   transaction_callback_ = transaction_callback;
 
+  enabled_service_server_ = private_node_handle_.advertiseService("enable_sensor",
+                                                                  &AsyncSensorModel::enableSensorCallback, this);
+
+  start_stop_thread_ = std::thread(&AsyncSensorModel::startStopThreadLoop, this);
+
+  sensor_enabled_pub_ = private_node_handle_.advertise<std_msgs::Bool>("sensor_enabled", 3, true);
+
+  active_ = private_node_handle_.param<bool>("auto_enabled", true);
+
   // Call the derived onInit() function to perform implementation-specific initialization
   onInit();
 
@@ -81,11 +103,24 @@ void AsyncSensorModel::initialize(
 
 void AsyncSensorModel::sendTransaction(Transaction::SharedPtr transaction)
 {
+  if (!active_)
+  {
+    ROS_WARN_STREAM_THROTTLE(1.0, "sensor: '" << name_ << "' is not active but tries to add transaction");
+    return;
+  }
   transaction_callback_(std::move(transaction));
 }
 
 void AsyncSensorModel::start()
 {
+  publishSensorsEnabled();
+
+  if (!active_)
+  {
+    // the sensor should not be active so do not start the sensor
+    return;
+  }
+
   auto callback = boost::make_shared<CallbackWrapper<void>>(std::bind(&AsyncSensorModel::onStart, this));
   auto result = callback->getFuture();
   callback_queue_.addCallback(callback, reinterpret_cast<uint64_t>(this));
@@ -94,8 +129,23 @@ void AsyncSensorModel::start()
 
 void AsyncSensorModel::stop()
 {
+
+  if (active_)
+  {
+    // the sensor should be active so do not stop the sensor
+
+    if (ros::ok())
+    {
+      publishSensorsEnabled();
+    }
+
+    return;
+  }
+
   if (ros::ok())
   {
+    publishSensorsEnabled();
+
     auto callback = boost::make_shared<CallbackWrapper<void>>(std::bind(&AsyncSensorModel::onStop, this));
     auto result = callback->getFuture();
     callback_queue_.addCallback(callback, reinterpret_cast<uint64_t>(this));
@@ -107,5 +157,73 @@ void AsyncSensorModel::stop()
     onStop();
   }
 }
+
+
+bool AsyncSensorModel::enableSensorCallback(std_srvs::SetBoolRequest& request, std_srvs::SetBoolResponse& response)
+{
+  response.success = false;
+
+  std::lock_guard<std::mutex> lock(start_stop_mutex_);
+
+  if (active_ && !static_cast<bool>(request.data))
+  {
+    ROS_INFO_STREAM("stop sensor: '" << name_ << "'");
+    active_ = false;
+    start_stop_request_ = StartStopEnum::STOP_SENSOR;
+    start_stop_condition_.notify_all();
+    response.success = true;
+  }
+  else if (!active_ && static_cast<bool>(request.data))
+  {
+    ROS_INFO_STREAM("start sensor: '" << name_ << "'");
+    active_ = true;
+    start_stop_request_ = StartStopEnum::START_SENSOR;
+    start_stop_condition_.notify_all();
+    response.success = true;
+  }
+  else
+  {
+    ROS_WARN_STREAM("no change due to service call for sensor '" << name_ << "'");
+  }
+
+  return true;
+}
+
+void AsyncSensorModel::startStopThreadLoop()
+{
+  while(true)
+  {
+    std::unique_lock<std::mutex> lock(start_stop_mutex_);
+    while (start_stop_request_ == StartStopEnum::KEEP_SENSOR_STATE)
+    {
+      start_stop_condition_.wait(lock);
+    }
+
+    switch (start_stop_request_)
+    {
+      case StartStopEnum::START_SENSOR:
+        start();
+        break;
+      case StartStopEnum::STOP_SENSOR:
+        stop();
+        break;
+      case StartStopEnum::KEEP_SENSOR_STATE:
+        //nothing to do just wait for the next call
+        break;
+      case StartStopEnum::STOP_THREAD:
+        return;
+    }
+
+    start_stop_request_ = StartStopEnum::KEEP_SENSOR_STATE;
+  }
+}
+
+void AsyncSensorModel::publishSensorsEnabled()
+{
+  std_msgs::Bool msg;
+  msg.data = static_cast<uint8_t>(active_);
+  sensor_enabled_pub_.publish(msg);
+}
+
 
 }  // namespace fuse_core
