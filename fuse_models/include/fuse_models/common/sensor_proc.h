@@ -73,6 +73,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <spdlog_ros/logging.hpp>
 
 
 namespace tf2
@@ -250,7 +251,7 @@ bool transformMessage(
   }
   catch (const tf2::TransformException& ex)
   {
-    ROS_WARN_STREAM_DELAYED_THROTTLE(5.0, "Could not transform message from " << input.header.frame_id << " to " <<
+    SPDLOG_ROS_WARN_STREAM_THROTTLE(NULL,5e9, "Could not transform message from " << input.header.frame_id << " to " <<
       output.header.frame_id << ". Error was " << ex.what());
   }
 
@@ -303,8 +304,8 @@ inline bool processAbsolutePoseWithCovariance(
 
     if (!transformMessage(tf_buffer, pose, transformed_message, tf_timeout))
     {
-      ROS_WARN_STREAM_DELAYED_THROTTLE(
-        10.0,
+      SPDLOG_ROS_WARN_STREAM_THROTTLE(NULL,
+        1e10,
         "Failed to transform pose message with stamp " << pose.header.stamp << ". Cannot create constraint.");
       return false;
     }
@@ -354,7 +355,7 @@ inline bool processAbsolutePoseWithCovariance(
     }
     catch (const std::runtime_error& ex)
     {
-      ROS_ERROR_STREAM_THROTTLE(10.0, "Invalid partial absolute pose measurement from '" << source
+      SPDLOG_ROS_ERROR_STREAM_THROTTLE(NULL,1e10, "Invalid partial absolute pose measurement from '" << source
                                                                                          << "' source: " << ex.what());
       return false;
     }
@@ -426,8 +427,8 @@ inline bool processAbsolutePose3DWithCovariance(
 
     if (!transformMessage(tf_buffer, pose, transformed_message, tf_timeout))
     {
-      ROS_WARN_STREAM_DELAYED_THROTTLE(
-        10.0,
+      SPDLOG_ROS_WARN_STREAM_THROTTLE(NULL,
+        1e10,
         "Failed to transform pose message with stamp " << pose.header.stamp << ". Cannot create constraint.");
       return false;
     }
@@ -468,7 +469,7 @@ inline bool processAbsolutePose3DWithCovariance(
     }
     catch (const std::runtime_error& ex)
     {
-      ROS_ERROR_STREAM_THROTTLE(10.0, "Invalid partial absolute pose measurement from '" << source
+      SPDLOG_ROS_ERROR_STREAM_THROTTLE(NULL,1e10, "Invalid partial absolute pose measurement from '" << source
                                                                                          << "' source: " << ex.what());
       return false;
     }
@@ -810,7 +811,7 @@ inline bool processDifferentialPoseWithCovariance(
     }
     catch (const std::runtime_error& ex)
     {
-      ROS_ERROR_STREAM_THROTTLE(10.0, "Invalid partial differential pose measurement from '"
+      SPDLOG_ROS_ERROR_STREAM_THROTTLE(NULL,1e10, "Invalid partial differential pose measurement from '"
                                           << source << "' source: " << ex.what());
       return false;
     }
@@ -1019,7 +1020,7 @@ inline bool processDifferentialPose3DWithCovariance(
     }
     catch (const std::runtime_error& ex)
     {
-      ROS_ERROR_STREAM_THROTTLE(10.0, "Invalid partial differential pose measurement from '"
+      SPDLOG_ROS_ERROR_STREAM_THROTTLE(NULL,1e10, "Invalid partial differential pose measurement from '"
                                           << source << "' source: " << ex.what());
       return false;
     }
@@ -1174,7 +1175,7 @@ inline bool processDifferentialPoseWithTwistCovariance(
 
   if (dt < 1e-6)
   {
-    ROS_ERROR_STREAM_THROTTLE(10.0, "Very small time difference " << dt << "s from '" << source << "' source.");
+    SPDLOG_ROS_ERROR_STREAM_THROTTLE(NULL,1e10, "Very small time difference " << dt << "s from '" << source << "' source.");
     return false;
   }
 
@@ -1207,7 +1208,7 @@ inline bool processDifferentialPoseWithTwistCovariance(
     }
     catch (const std::runtime_error& ex)
     {
-      ROS_ERROR_STREAM_THROTTLE(10.0, "Invalid partial differential pose measurement using the twist covariance from '"
+      SPDLOG_ROS_ERROR_STREAM_THROTTLE(NULL,1e10, "Invalid partial differential pose measurement using the twist covariance from '"
                                           << source << "' source: " << ex.what());
       return false;
     }
@@ -1369,7 +1370,7 @@ inline bool processDifferentialPoseWithTwist3DCovariance(
 
   if (dt < 1e-6)
   {
-    ROS_ERROR_STREAM_THROTTLE(10.0, "Very small time difference " << dt << "s from '" << source << "' source.");
+    SPDLOG_ROS_ERROR_STREAM_THROTTLE(NULL,1e10, "Very small time difference " << dt << "s from '" << source << "' source.");
     return false;
   }
 
@@ -1402,7 +1403,7 @@ inline bool processDifferentialPoseWithTwist3DCovariance(
     }
     catch (const std::runtime_error& ex)
     {
-      ROS_ERROR_STREAM_THROTTLE(10.0, "Invalid partial differential pose measurement using the twist covariance from '"
+      SPDLOG_ROS_ERROR_STREAM_THROTTLE(NULL,10.0, "Invalid partial differential pose measurement using the twist covariance from '"
                                           << source << "' source: " << ex.what());
       return false;
     }
@@ -1482,8 +1483,8 @@ inline bool processTwistWithCovariance(
 
     if (!transformMessage(tf_buffer, twist, transformed_message, tf_timeout))
     {
-      ROS_WARN_STREAM_DELAYED_THROTTLE(
-        10.0,
+      SPDLOG_ROS_WARN_STREAM_THROTTLE(NULL,
+        1e10,
         "Failed to transform twist message with stamp " << twist.header.stamp << ". Cannot create constraint.");
       return false;
     }
@@ -1532,7 +1533,7 @@ inline bool processTwistWithCovariance(
       }
       catch (const std::runtime_error& ex)
       {
-        ROS_ERROR_STREAM_THROTTLE(10.0, "Invalid partial linear velocity measurement from '"
+        SPDLOG_ROS_ERROR_STREAM_THROTTLE(NULL,1e10, "Invalid partial linear velocity measurement from '"
                                             << source << "' source: " << ex.what());
         add_constraint = false;
       }
@@ -1574,7 +1575,7 @@ inline bool processTwistWithCovariance(
       }
       catch (const std::runtime_error& ex)
       {
-        ROS_ERROR_STREAM_THROTTLE(10.0, "Invalid partial angular velocity measurement from '"
+        SPDLOG_ROS_ERROR_STREAM_THROTTLE(NULL,1e10, "Invalid partial angular velocity measurement from '"
                                             << source << "' source: " << ex.what());
         add_constraint = false;
       }
@@ -1650,8 +1651,8 @@ inline bool processTwist3DWithCovariance(
 
     if (!transformMessage(tf_buffer, twist, transformed_message, tf_timeout))
     {
-      ROS_WARN_STREAM_DELAYED_THROTTLE(
-        10.0,
+      SPDLOG_ROS_WARN_STREAM_THROTTLE(NULL,
+        1e10,
         "Failed to transform twist message with stamp " << twist.header.stamp << ". Cannot create constraint.");
       return false;
     }
@@ -1702,7 +1703,7 @@ inline bool processTwist3DWithCovariance(
       }
       catch (const std::runtime_error& ex)
       {
-        ROS_ERROR_STREAM_THROTTLE(10.0, "Invalid partial linear velocity measurement from '"
+        SPDLOG_ROS_ERROR_STREAM_THROTTLE(NULL,1e10, "Invalid partial linear velocity measurement from '"
                                             << source << "' source: " << ex.what());
         add_constraint = false;
       }
@@ -1763,7 +1764,7 @@ inline bool processTwist3DWithCovariance(
       }
       catch (const std::runtime_error& ex)
       {
-        ROS_ERROR_STREAM_THROTTLE(10.0, "Invalid partial angular velocity measurement from '"
+        SPDLOG_ROS_ERROR_STREAM_THROTTLE(NULL,1e10, "Invalid partial angular velocity measurement from '"
                                             << source << "' source: " << ex.what());
         add_constraint = false;
       }
@@ -1836,8 +1837,8 @@ inline bool processAccelWithCovariance(
 
     if (!transformMessage(tf_buffer, acceleration, transformed_message, tf_timeout))
     {
-      ROS_WARN_STREAM_DELAYED_THROTTLE(
-        10.0,
+      SPDLOG_ROS_WARN_STREAM_THROTTLE(NULL,
+        1e10,
         "Failed to transform acceleration message with stamp " << acceleration.header.stamp
                                                                << ". Cannot create constraint.");
       return false;
@@ -1875,7 +1876,7 @@ inline bool processAccelWithCovariance(
     }
     catch (const std::runtime_error& ex)
     {
-      ROS_ERROR_STREAM_THROTTLE(10.0, "Invalid partial linear acceleration measurement from '"
+      SPDLOG_ROS_ERROR_STREAM_THROTTLE(NULL,1e10, "Invalid partial linear acceleration measurement from '"
                                           << source << "' source: " << ex.what());
       return false;
     }
@@ -1944,8 +1945,8 @@ inline bool processAccel3DWithCovariance(
 
     if (!transformMessage(tf_buffer, acceleration, transformed_message, tf_timeout))
     {
-      ROS_WARN_STREAM_DELAYED_THROTTLE(
-        10.0,
+      SPDLOG_ROS_WARN_STREAM_THROTTLE(NULL,
+        1e10,
         "Failed to transform acceleration message with stamp " << acceleration.header.stamp
                                                                << ". Cannot create constraint.");
       return false;
@@ -1985,7 +1986,7 @@ inline bool processAccel3DWithCovariance(
     }
     catch (const std::runtime_error& ex)
     {
-      ROS_ERROR_STREAM_THROTTLE(10.0, "Invalid partial linear acceleration measurement from '"
+      SPDLOG_ROS_ERROR_STREAM_THROTTLE(NULL,1e10, "Invalid partial linear acceleration measurement from '"
                                           << source << "' source: " << ex.what());
       return false;
     }

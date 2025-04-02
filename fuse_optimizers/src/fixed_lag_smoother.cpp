@@ -47,6 +47,7 @@
 #include <string>
 #include <thread>
 #include <vector>
+#include <spdlog_ros/logging.hpp>
 
 
 namespace
@@ -129,7 +130,7 @@ void FixedLagSmoother::autostart()
     // No ignition sensors were provided. Auto-start.
     started_ = true;
     setStartTime(ros::Time(0, 0));
-    ROS_INFO_STREAM("No ignition sensors were specified. Optimization will begin immediately.");
+    SPDLOG_ROS_INFO_STREAM("No ignition sensors were specified. Optimization will begin immediately.");
   }
 }
 
@@ -214,7 +215,7 @@ void FixedLagSmoother::optimizationLoop()
         oss << "\nTransaction:\n";
         new_transaction->print(oss);
 
-        ROS_FATAL_STREAM("Failed to update graph with transaction: " << ex.what()
+        SPDLOG_ROS_FATAL_STREAM("Failed to update graph with transaction: " << ex.what()
                                                                      << "\nLeaving optimization loop and requesting "
                                                                         "node shutdown...\n" << oss.str());
         ros::requestShutdown();
@@ -232,10 +233,10 @@ void FixedLagSmoother::optimizationLoop()
         oss << "\nTransaction:\n";
         new_transaction->print(oss);
 
-        ROS_FATAL_STREAM("Optimization failed after updating the graph with the transaction with timestamp "
+        SPDLOG_ROS_FATAL_STREAM("Optimization failed after updating the graph with the transaction with timestamp "
                          << new_transaction->stamp() << ". Leaving optimization loop and requesting node shutdown...\n"
                          << oss.str());
-        ROS_INFO_STREAM(summary_.FullReport());
+        SPDLOG_ROS_INFO_STREAM(summary_.FullReport());
         ros::requestShutdown();
         break;
       }
@@ -256,7 +257,7 @@ void FixedLagSmoother::optimizationLoop()
       auto optimization_complete = ros::Time::now();
       if (optimization_complete > optimization_deadline)
       {
-        ROS_WARN_STREAM_THROTTLE(10.0, "Optimization exceeded the configured duration by "
+        SPDLOG_ROS_WARN_STREAM_THROTTLE(NULL,1e10, "Optimization exceeded the configured duration by "
                                            << (optimization_complete - optimization_deadline) << "s");
       }
     }
@@ -320,7 +321,7 @@ void FixedLagSmoother::processQueue(fuse_core::Transaction& transaction, const r
     {
       // We just started, but the oldest transaction is not from an ignition sensor. We will still process the
       // transaction, but we do not enforce it is processed individually.
-      ROS_ERROR_STREAM("The queued transaction with timestamp " << element.stamp() << " from sensor " <<
+      SPDLOG_ROS_ERROR_STREAM("The queued transaction with timestamp " << element.stamp() << " from sensor " <<
                        element.sensor_name << " is not an ignition sensor transaction. " <<
                        "This transaction will not be processed individually.");
     }
@@ -337,7 +338,7 @@ void FixedLagSmoother::processQueue(fuse_core::Transaction& transaction, const r
       {
         // The motion model processing failed. When this happens to an ignition sensor transaction there is no point on
         // trying again next time, so we ignore this transaction.
-        ROS_ERROR_STREAM("The queued ignition transaction with timestamp " << element.stamp() << " from sensor " <<
+        SPDLOG_ROS_ERROR_STREAM("The queued ignition transaction with timestamp " << element.stamp() << " from sensor " <<
                          element.sensor_name << " could not be processed. Ignoring this ignition transaction.");
 
         // Remove the ignition transaction that just failed and purge all transactions after it. But if we find another
@@ -382,7 +383,7 @@ void FixedLagSmoother::processQueue(fuse_core::Transaction& transaction, const r
     const auto& min_stamp = element.minStamp();
     if (min_stamp < lag_expiration)
     {
-      ROS_DEBUG_STREAM("The current lag expiration time is " << lag_expiration << ". The queued transaction with "
+      SPDLOG_ROS_DEBUG_STREAM("The current lag expiration time is " << lag_expiration << ". The queued transaction with "
                        "timestamp " << element.stamp() << " from sensor " << element.sensor_name << " has a minimum "
                        "involved timestamp of " << min_stamp << ", which is " << (lag_expiration - min_stamp) <<
                        " seconds too old. Ignoring this transaction.");
@@ -407,7 +408,7 @@ void FixedLagSmoother::processQueue(fuse_core::Transaction& transaction, const r
       if (max_stamp + params_.transaction_timeout < current_time)
       {
         // Warn that this transaction has expired, then skip it.
-        ROS_ERROR_STREAM("The queued transaction with timestamp " << element.stamp() << " and maximum "
+        SPDLOG_ROS_ERROR_STREAM("The queued transaction with timestamp " << element.stamp() << " and maximum "
                           "involved stamp of " << max_stamp << " from sensor " << element.sensor_name <<
                           " could not be processed after " << (current_time - max_stamp) << " seconds, "
                           "which is greater than the 'transaction_timeout' value of " <<
@@ -469,7 +470,7 @@ void FixedLagSmoother::transactionCallback(
   const auto max_time = transaction->maxStamp();
   if (started_ && max_time < start_time)
   {
-    ROS_DEBUG_STREAM("Received a transaction before the start time from sensor '" << sensor_name << "'.\n" <<
+    SPDLOG_ROS_DEBUG_STREAM("Received a transaction before the start time from sensor '" << sensor_name << "'.\n" <<
                      "  start_time: " << start_time << ", maximum involved stamp: " << max_time <<
                      ", difference: " << (start_time - max_time) << "s");
     return;

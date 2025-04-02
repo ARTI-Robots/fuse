@@ -41,7 +41,7 @@
 #include <string>
 #include <utility>
 #include <thread>
-
+#include <spdlog_ros/logging.hpp>
 
 namespace fuse_optimizers
 {
@@ -99,7 +99,7 @@ void BatchOptimizer::applyMotionModelsToQueue()
       if (element.transaction->stamp() + params_.transaction_timeout < current_time)
       {
         // Warn that this transaction has expired, then skip it.
-        ROS_ERROR_STREAM("The queued transaction with timestamp " << element.transaction->stamp()
+        SPDLOG_ROS_ERROR_STREAM("The queued transaction with timestamp " << element.transaction->stamp()
                           << " could not be processed after " << (current_time - element.transaction->stamp())
                           << " seconds, which is greater than the 'transaction_timeout' value of "
                           << params_.transaction_timeout << ". Ignoring this transaction.");

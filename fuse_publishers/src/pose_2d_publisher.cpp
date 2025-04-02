@@ -46,6 +46,7 @@
 #include <ros/ros.h>
 #include <tf2/utils.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <spdlog_ros/logging.hpp>
 
 #include <exception>
 #include <memory>
@@ -84,12 +85,12 @@ bool findPose(
   }
   catch (const std::exception& e)
   {
-    ROS_WARN_STREAM_THROTTLE(10.0, "Failed to find a pose at time " << stamp << ". Error" << e.what());
+    SPDLOG_ROS_WARN_STREAM_THROTTLE(NULL,1e10, "Failed to find a pose at time " << stamp << ". Error" << e.what());
     return false;
   }
   catch (...)
   {
-    ROS_WARN_STREAM_THROTTLE(10.0, "Failed to find a pose at time " << stamp << ". Error: unknown");
+    SPDLOG_ROS_WARN_STREAM_THROTTLE(NULL,1e10, "Failed to find a pose at time " << stamp << ". Error: unknown");
     return false;
   }
   return true;
@@ -136,7 +137,7 @@ void Pose2DPublisher::onInit()
       private_node_handle_.param("tf_cache_time", tf_cache_time, default_tf_cache_time);
       if (tf_cache_time <= 0)
       {
-        ROS_WARN_STREAM("The requested tf_cache_time is <= 0. Using the default value (" <<
+        SPDLOG_ROS_WARN_STREAM("The requested tf_cache_time is <= 0. Using the default value (" <<
                         default_tf_cache_time << "s) instead.");
         tf_cache_time = default_tf_cache_time;
       }
@@ -146,7 +147,7 @@ void Pose2DPublisher::onInit()
       private_node_handle_.param("tf_timeout", tf_timeout, default_tf_timeout);
       if (tf_timeout <= 0)
       {
-        ROS_WARN_STREAM("The requested tf_timeout is <= 0. Using the default value (" <<
+        SPDLOG_ROS_WARN_STREAM("The requested tf_timeout is <= 0. Using the default value (" <<
                         default_tf_timeout << "s) instead.");
         tf_timeout = default_tf_timeout;
       }
@@ -161,7 +162,7 @@ void Pose2DPublisher::onInit()
     private_node_handle_.param("tf_publish_frequency", tf_publish_frequency, default_tf_publish_frequency);
     if (tf_publish_frequency <= 0)
     {
-      ROS_WARN_STREAM("The requested tf_publish_frequency is <= 0. Using the default value (" <<
+      SPDLOG_ROS_WARN_STREAM("The requested tf_publish_frequency is <= 0. Using the default value (" <<
                       default_tf_publish_frequency << "hz) instead.");
       tf_publish_frequency = default_tf_publish_frequency;
     }
@@ -204,8 +205,8 @@ void Pose2DPublisher::notifyCallback(
   auto latest_stamp = synchronizer_->findLatestCommonStamp(*transaction, *graph);
   if (latest_stamp == Synchronizer::TIME_ZERO)
   {
-    ROS_WARN_STREAM_THROTTLE(
-        10.0, "Failed to find a matching set of stamped pose variables with device id '" << device_id_ << "'.");
+    SPDLOG_ROS_WARN_STREAM_THROTTLE(NULL,
+      1e10, "Failed to find a matching set of stamped pose variables with device id '" << device_id_ << "'.");
     return;
   }
   // Get the pose values associated with the selected timestamp
@@ -243,7 +244,7 @@ void Pose2DPublisher::notifyCallback(
       }
       catch (const std::exception& e)
       {
-        ROS_WARN_STREAM_THROTTLE(2.0, "Could not lookup the transform " << base_frame_ << "->" << odom_frame_ <<
+        SPDLOG_ROS_WARN_STREAM_THROTTLE(NULL,2e9, "Could not lookup the transform " << base_frame_ << "->" << odom_frame_ <<
                                       ". Error: " << e.what());
       }
     }

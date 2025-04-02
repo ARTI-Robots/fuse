@@ -24,6 +24,7 @@
   <depend>pluginlib</depend>
   <depend>roscpp</depend>
   <depend>suitesparse</depend>
+  <depend>spdlog_ros</depend>
   <test_depend condition="$ROS_DISTRO >= melodic">benchmark</test_depend>
   <test_depend>roslint</test_depend>
   <test_depend>rostest</test_depend>

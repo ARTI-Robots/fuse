@@ -41,6 +41,7 @@
 #include <boost/range/algorithm.hpp>
 #include <boost/range/empty.hpp>
 #include <boost/range/size.hpp>
+#include <spdlog_ros/logging.hpp>
 
 // Register this sensor model with ROS as a plugin.
 PLUGINLIB_EXPORT_CLASS(fuse_models::GraphIgnition, fuse_core::SensorModel);
@@ -88,7 +89,7 @@ void GraphIgnition::subscriberCallback(const fuse_msgs::SerializedGraph::ConstPt
   }
   catch (const std::exception& e)
   {
-    ROS_ERROR_STREAM(e.what() << " Ignoring message.");
+    SPDLOG_ROS_ERROR_STREAM(e.what() << " Ignoring message.");
   }
 }
 
@@ -103,7 +104,7 @@ bool GraphIgnition::setGraphServiceCallback(fuse_models::SetGraph::Request& req,
   {
     res.success = false;
     res.message = e.what();
-    ROS_ERROR_STREAM(e.what() << " Ignoring request.");
+    SPDLOG_ROS_ERROR_STREAM(e.what() << " Ignoring request.");
   }
   return true;
 }
@@ -136,7 +137,7 @@ void GraphIgnition::process(const fuse_msgs::SerializedGraph& msg)
     // Wait for the reset service
     while (!reset_client_.waitForExistence(ros::Duration(10.0)) && ros::ok())
     {
-      ROS_WARN_STREAM("Waiting for '" << reset_client_.getService() << "' service to become avaiable.");
+      SPDLOG_ROS_WARN_STREAM("Waiting for '" << reset_client_.getService() << "' service to become avaiable.");
     }
 
     auto srv = std_srvs::Empty();
@@ -186,7 +187,7 @@ void GraphIgnition::sendGraph(const fuse_core::Graph& graph, const ros::Time& st
   // Send the transaction to the optimizer.
   sendTransaction(transaction);
 
-  ROS_INFO_STREAM("Received a set_graph request (stamp: "
+  SPDLOG_ROS_INFO_STREAM("Received a set_graph request (stamp: "
                   << transaction->stamp() << ", constraints: " << boost::size(transaction->addedConstraints())
                   << ", variables: " << boost::size(transaction->addedVariables()) << ")");
 }

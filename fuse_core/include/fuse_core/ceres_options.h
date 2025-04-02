@@ -44,6 +44,7 @@
 #include <ceres/problem.h>
 #include <ceres/solver.h>
 #include <ceres/types.h>
+#include <spdlog_ros/logging.hpp>
 
 #include <string>
 
@@ -201,7 +202,7 @@ T getParam(const ros::NodeHandle& node_handle, const std::string& parameter_name
   T value;
   if (!FromString(string_value, &value))
   {
-    ROS_WARN_STREAM("The requested " << parameter_name << " (" << string_value
+    SPDLOG_ROS_WARN_STREAM("The requested " << parameter_name << " (" << string_value
                                      << ") is not supported. Using the default value (" << default_string_value
                                      << ") instead.");
     value = default_value;

@@ -43,6 +43,7 @@
 #include <pluginlib/class_list_macros.hpp>
 #include <sensor_msgs/PointCloud2.h>
 #include <sensor_msgs/point_cloud2_iterator.h>
+#include <spdlog_ros/logging.hpp>
 
 // Register this sensor model with ROS as a plugin.
 PLUGINLIB_EXPORT_CLASS(fuse_tutorials::RangeSensorModel, fuse_core::SensorModel);
@@ -61,7 +62,7 @@ void RangeSensorModel::priorBeaconsCallback(const sensor_msgs::PointCloud2::Cons
   {
     beacon_db_[*id_it] = Beacon { *x_it, *y_it, *sigma_it };
   }
-  ROS_INFO_STREAM("Updated Beacon Database.");
+  SPDLOG_ROS_INFO_STREAM("Updated Beacon Database.");
 }
 
 void RangeSensorModel::onInit()

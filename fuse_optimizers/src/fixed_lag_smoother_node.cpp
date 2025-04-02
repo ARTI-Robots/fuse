@@ -35,12 +35,18 @@
 #include <fuse_graphs/hash_graph_params.h>
 #include <fuse_optimizers/fixed_lag_smoother.h>
 #include <ros/ros.h>
+#include <spdlog_ros/logging.hpp>
+#include <spdlog_ros/ros_sink.hpp>
 
 
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "fixed_lag_smoother_node");
   ros::NodeHandle private_node_handle("~");
+  auto ros_sink = std::make_shared<spdlog_ros::RosSink>(private_node_handle);
+  auto logger = spdlog_ros::CreateAsyncLogger("FixedLagSmoother", {ros_sink});
+  logger->set_level(SPDLOG_ROS_LEVEL_DEBUG); 
+  spdlog::set_default_logger(logger);
   fuse_graphs::HashGraphParams hash_graph_params;
   hash_graph_params.loadFromROS(private_node_handle);
   fuse_optimizers::FixedLagSmoother optimizer(fuse_graphs::HashGraph::make_unique(hash_graph_params));

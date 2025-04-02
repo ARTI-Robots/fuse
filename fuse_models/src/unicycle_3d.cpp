@@ -51,6 +51,7 @@
 #include <pluginlib/class_list_macros.hpp>
 #include <ros/ros.h>
 #include <tf2/utils.h>
+#include <spdlog_ros/logging.hpp>
 
 #include <stdexcept>
 #include <string>
@@ -206,7 +207,7 @@ bool Unicycle3D::applyCallback(fuse_core::Transaction& transaction)
   }
   catch (const std::exception& e)
   {
-    ROS_ERROR_STREAM_THROTTLE(10.0, "An error occurred while completing the motion model query. Error: " << e.what());
+    SPDLOG_ROS_ERROR_STREAM_THROTTLE(NULL,1e10, "An error occurred while completing the motion model query. Error: " << e.what());
     return false;
   }
   return true;
@@ -269,7 +270,7 @@ void Unicycle3D::generateMotionModel(
   auto base_state_pair_it = state_history_.upper_bound(beginning_stamp);
   if (base_state_pair_it == state_history_.begin())
   {
-    ROS_WARN_STREAM_COND_NAMED(!state_history_.empty(), "UnicycleModel", "Unable to locate a state in this history "
+    SPDLOG_ROS_WARN_STREAM_EXPRESSION_NAMED("UnicycleModel", !state_history_.empty(), "Unable to locate a state in this history "
                                "with stamp <= " << beginning_stamp << ". Variables will all be initialized to 0.");
     base_time = beginning_stamp;
   }
@@ -425,7 +426,7 @@ void Unicycle3D::generateMotionModel(
     }
     catch (const std::runtime_error& ex)
     {
-      ROS_ERROR_STREAM_THROTTLE(10.0, "Invalid '" << name() << "' motion model: " << ex.what());
+      SPDLOG_ROS_ERROR_STREAM_THROTTLE(NULL,1e10, "Invalid '" << name() << "' motion model: " << ex.what());
       return;
     }
   }

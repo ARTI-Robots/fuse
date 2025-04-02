@@ -55,6 +55,7 @@
 #include <fuse_core/uuid.h>
 #include <fuse_variables/orientation_2d_stamped.h>
 #include <fuse_variables/position_2d_stamped.h>
+#include <spdlog_ros/logging.hpp>
 
 #include <boost/range.hpp>
 
@@ -170,7 +171,7 @@ void SerializedGraphDisplay::processMessage(const fuse_msgs::SerializedGraph::Co
   Ogre::Quaternion orientation;
   if (!context_->getFrameManager()->getTransform(msg->header, position, orientation))
   {
-    ROS_DEBUG_STREAM("Error transforming from frame '" << msg->header.frame_id << "' to frame '"
+    SPDLOG_ROS_DEBUG_STREAM("Error transforming from frame '" << msg->header.frame_id << "' to frame '"
                                                        << qPrintable(fixed_frame_) << "'");
   }
 

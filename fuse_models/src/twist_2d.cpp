@@ -40,6 +40,7 @@
 #include <geometry_msgs/TwistWithCovarianceStamped.h>
 #include <pluginlib/class_list_macros.hpp>
 #include <ros/ros.h>
+#include <spdlog_ros/logging.hpp>
 
 
 // Register this sensor model with ROS as a plugin.
@@ -69,7 +70,7 @@ void Twist2D::onInit()
   if (params_.linear_indices.empty() &&
       params_.angular_indices.empty())
   {
-    ROS_WARN_STREAM("No dimensions were specified. Data from topic " << ros::names::resolve(params_.topic) <<
+    SPDLOG_ROS_WARN_STREAM("No dimensions were specified. Data from topic " << ros::names::resolve(params_.topic) <<
                     " will be ignored.");
   }
 }

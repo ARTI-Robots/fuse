@@ -54,6 +54,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <spdlog_ros/logging.hpp>
 
 
 namespace fuse_models
@@ -70,7 +71,7 @@ namespace common
 inline void throwDimensionError(const std::string& dimension)
 {
   std::string error = "Dimension " + dimension + " is not valid for this type.";
-  ROS_ERROR_STREAM(error);
+  SPDLOG_ROS_ERROR_STREAM(error);
   throw std::runtime_error(error);
 }
 

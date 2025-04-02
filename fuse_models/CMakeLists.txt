@@ -21,6 +21,7 @@ find_package(
     tf2
     tf2_2d
     tf2_geometry_msgs
+    spdlog_ros
     tf2_ros)
 
 find_package(Ceres REQUIRED)

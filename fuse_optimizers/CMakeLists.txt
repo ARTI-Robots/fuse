@@ -10,6 +10,7 @@ set(build_depends
   pluginlib
   roscpp
   std_srvs
+  spdlog_ros
 )
 
 find_package(catkin REQUIRED COMPONENTS

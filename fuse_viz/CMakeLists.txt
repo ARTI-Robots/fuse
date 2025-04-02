@@ -9,6 +9,7 @@ set(build_depends
   geometry_msgs
   rviz
   tf2_geometry_msgs
+  spdlog_ros
 )
 
 find_package(catkin REQUIRED COMPONENTS

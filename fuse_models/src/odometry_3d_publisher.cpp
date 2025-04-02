@@ -54,6 +54,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <spdlog_ros/logging.hpp>
 
 // Register this publisher with ROS as a plugin.
 PLUGINLIB_EXPORT_CLASS(fuse_models::Odometry3DPublisher, fuse_core::Publisher)
@@ -112,8 +113,8 @@ void Odometry3DPublisher::notifyCallback(
       latest_stamp_ = latest_stamp;
     }
 
-    ROS_WARN_STREAM_THROTTLE(
-        10.0, "Failed to find a matching set of state variables with device id '" << device_id_ << "'.");
+    SPDLOG_ROS_WARN_STREAM_THROTTLE(NULL,
+      1e10, "Failed to find a matching set of state variables with device id '" << device_id_ << "'.");
     return;
   }
 
@@ -297,7 +298,7 @@ void Odometry3DPublisher::notifyCallback(
       }
       catch (const std::exception& e)
       {
-        ROS_WARN_STREAM("An error occurred computing the covariance information for " << latest_stamp << ". "
+        SPDLOG_ROS_WARN_STREAM("An error occurred computing the covariance information for " << latest_stamp << ". "
                         "The covariance will be set to zero.\n" << e.what());
         std::fill(odom_output.pose.covariance.begin(), odom_output.pose.covariance.end(), 0.0);
         std::fill(odom_output.twist.covariance.begin(), odom_output.twist.covariance.end(), 0.0);
@@ -401,7 +402,7 @@ bool Odometry3DPublisher::getState(
     acceleration.accel.accel.angular.y = 0.0;
     acceleration.accel.accel.angular.z = 0.0;
 
-    ROS_DEBUG_STREAM("Odometry3DPublisher::getState: " << std::endl <<
+    SPDLOG_ROS_DEBUG_STREAM("Odometry3DPublisher::getState: " << std::endl <<
                     "position_variable: " << position_variable << std::endl <<
                     "orientation_variable: " << position_variable << std::endl <<
                     "velocity_linear_variable: " << position_variable << std::endl <<
@@ -413,12 +414,12 @@ bool Odometry3DPublisher::getState(
   }
   catch (const std::exception& e)
   {
-    ROS_WARN_STREAM_THROTTLE(10.0, "Failed to find a state at time " << stamp << ". Error: " << e.what());
+    SPDLOG_ROS_WARN_STREAM_THROTTLE(NULL,1e10, "Failed to find a state at time " << stamp << ". Error: " << e.what());
     return false;
   }
   catch (...)
   {
-    ROS_WARN_STREAM_THROTTLE(10.0, "Failed to find a state at time " << stamp << ". Error: unknown");
+    SPDLOG_ROS_WARN_STREAM_THROTTLE(NULL,1e10, "Failed to find a state at time " << stamp << ". Error: unknown");
     return false;
   }
 
@@ -444,7 +445,7 @@ void Odometry3DPublisher::publishTimerCallback(const ros::TimerEvent& event)
 
   if (latest_stamp == Synchronizer::TIME_ZERO)
   {
-    ROS_WARN_STREAM_FILTER(&delayed_throttle_filter_, "No valid state data yet. Delaying tf broadcast.");
+    SPDLOG_ROS_WARN_STREAM_EXPRESSION(delayed_throttle_filter_.isEnabled(), "No valid state data yet. Delaying tf broadcast.");
     return;
   }
 
@@ -672,7 +673,7 @@ void Odometry3DPublisher::publishTimerCallback(const ros::TimerEvent& event)
       }
       catch (const std::exception& e)
       {
-        ROS_WARN_STREAM_THROTTLE(5.0, "Could not lookup the " << params_.base_link_frame_id << "->" <<
+        SPDLOG_ROS_WARN_STREAM_THROTTLE(NULL,5e9, "Could not lookup the " << params_.base_link_frame_id << "->" <<
           params_.odom_frame_id << " transform. Error: " << e.what());
 
         return;

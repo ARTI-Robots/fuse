@@ -35,6 +35,7 @@
 #include <OgreQuaternion.h>
 #include <OgreSceneManager.h>
 #include <OgreSceneNode.h>
+#include <spdlog_ros/logging.hpp>
 
 #include <ros/console.h>
 
@@ -120,7 +121,7 @@ void computeShapeScaleAndOrientation3D(const Eigen::Matrix3d& covariance, Ogre::
   }
   else
   {
-    ROS_WARN_THROTTLE(1, "failed to compute eigen vectors/values for position. Is the covariance matrix correct?");
+    SPDLOG_ROS_WARN_THROTTLE(NULL,1e9, "failed to compute eigen vectors/values for position. Is the covariance matrix correct?");
     eigenvalues = Eigen::Vector3d::Zero();  // Setting the scale to zero will hide it on the screen
     eigenvectors = Eigen::Matrix3d::Identity();
   }
@@ -163,7 +164,7 @@ void computeShapeScaleAndOrientation2D(const Eigen::Matrix2d& covariance, Ogre::
   }
   else
   {
-    ROS_WARN_THROTTLE(1, "failed to compute eigen vectors/values for position. Is the covariance matrix correct?");
+    SPDLOG_ROS_WARN_THROTTLE(NULL,1e9, "failed to compute eigen vectors/values for position. Is the covariance matrix correct?");
     eigenvalues = Eigen::Vector2d::Zero();  // Setting the scale to zero will hide it on the screen
     eigenvectors = Eigen::Matrix2d::Identity();
   }
@@ -309,7 +310,7 @@ void MappedCovarianceVisual::setCovariance(const geometry_msgs::PoseWithCovarian
   {
     if (std::isnan(pose.covariance[i]))
     {
-      ROS_WARN_THROTTLE(1, "covariance contains NaN");
+      SPDLOG_ROS_WARN_THROTTLE(NULL,1e9, "covariance contains NaN");
       return;
     }
   }
@@ -364,7 +365,7 @@ void MappedCovarianceVisual::updatePosition(const Eigen::Matrix6d& covariance)
   if (!shape_scale.isNaN())
     position_node_->setScale(shape_scale);
   else
-    ROS_WARN_STREAM("position shape_scale contains NaN: " << shape_scale);
+    SPDLOG_ROS_WARN_STREAM("position shape_scale contains NaN: " << shape_scale);
 }
 
 void MappedCovarianceVisual::updateOrientation(const Eigen::Matrix6d& covariance, ShapeIndex index)
@@ -431,7 +432,7 @@ void MappedCovarianceVisual::updateOrientation(const Eigen::Matrix6d& covariance
   if (!shape_scale.isNaN())
     orientation_shape_[index]->setScale(shape_scale);
   else
-    ROS_WARN_STREAM("orientation shape_scale contains NaN: " << shape_scale);
+    SPDLOG_ROS_WARN_STREAM("orientation shape_scale contains NaN: " << shape_scale);
 }
 
 void MappedCovarianceVisual::setScales(float pos_scale, float ori_scale)

@@ -42,6 +42,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <spdlog_ros/logging.hpp>
 
 namespace fuse_core
 {
@@ -60,7 +61,7 @@ void getParamRequired(const ros::NodeHandle& nh, const std::string& key, T& valu
   if (!nh.getParam(key, value))
   {
     const std::string error = "Could not find required parameter " + key + " in namespace " + nh.getNamespace();
-    ROS_FATAL_STREAM(error);
+    SPDLOG_ROS_FATAL_STREAM(error);
     throw std::runtime_error(error);
   }
 }
@@ -83,7 +84,7 @@ void getPositiveParam(const ros::NodeHandle& node_handle, const std::string& par
   node_handle.param(parameter_name, value, default_value);
   if (value < 0 || (strict && value == 0))
   {
-    ROS_WARN_STREAM("The requested " << parameter_name << " is <" << (strict ? "=" : "") <<
+    SPDLOG_ROS_WARN_STREAM("The requested " << parameter_name << " is <" << (strict ? "=" : "") <<
                     " 0. Using the default value (" << default_value << ") instead.");
   }
   else

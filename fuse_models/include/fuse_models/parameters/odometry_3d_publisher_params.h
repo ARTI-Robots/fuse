@@ -49,6 +49,7 @@
 #include <cassert>
 #include <string>
 #include <vector>
+#include <spdlog_ros/logging.hpp>
 
 
 namespace fuse_models
@@ -105,7 +106,7 @@ public:
 
     if (!frames_valid)
     {
-      ROS_FATAL_STREAM("Invalid frame configuration! Please note:\n" <<
+      SPDLOG_ROS_FATAL_STREAM("Invalid frame configuration! Please note:\n" <<
         " - The values for map_frame_id, odom_frame_id, and base_link_frame_id must be unique\n" <<
         " - The values for map_frame_id, odom_frame_id, and base_link_output_frame_id must be unique\n" <<
         " - The world_frame_id must be the same as the map_frame_id or odom_frame_id\n");

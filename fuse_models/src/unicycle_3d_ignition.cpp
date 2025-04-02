@@ -56,6 +56,7 @@
 #include <tf2/convert.h>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+#include <spdlog_ros/logging.hpp>
 
 #include <Eigen/Dense>
 
@@ -148,7 +149,7 @@ void Unicycle3DIgnition::subscriberCallback(const geometry_msgs::PoseWithCovaria
   }
   catch (const std::exception& e)
   {
-    ROS_ERROR_STREAM(e.what() << " Ignoring message.");
+    SPDLOG_ROS_ERROR_STREAM(e.what() << " Ignoring message.");
   }
 }
 
@@ -163,7 +164,7 @@ bool Unicycle3DIgnition::setPoseServiceCallback(fuse_models::SetPose::Request& r
   {
     res.success = false;
     res.message = e.what();
-    ROS_ERROR_STREAM(e.what() << " Ignoring request.");
+    SPDLOG_ROS_ERROR_STREAM(e.what() << " Ignoring request.");
   }
   return true;
 }
@@ -179,7 +180,7 @@ bool Unicycle3DIgnition::setPoseDeprecatedServiceCallback(
   }
   catch (const std::exception& e)
   {
-    ROS_ERROR_STREAM(e.what() << " Ignoring request.");
+    SPDLOG_ROS_ERROR_STREAM(e.what() << " Ignoring request.");
     return false;
   }
 }
@@ -242,7 +243,7 @@ void Unicycle3DIgnition::process(const geometry_msgs::PoseWithCovarianceStamped&
     // Wait for the reset service
     while (!reset_client_.waitForExistence(ros::Duration(10.0)) && ros::ok())
     {
-      ROS_WARN_STREAM("Waiting for '" << reset_client_.getService() << "' service to become avaiable.");
+      SPDLOG_ROS_WARN_STREAM("Waiting for '" << reset_client_.getService() << "' service to become avaiable.");
     }
 
     auto srv = std_srvs::Empty();
@@ -360,7 +361,7 @@ void Unicycle3DIgnition::sendPrior(const geometry_msgs::PoseWithCovarianceStampe
   // Send the transaction to the optimizer.
   sendTransaction(transaction);
 
-  ROS_INFO_STREAM("Received a set_pose request ("
+  SPDLOG_ROS_INFO_STREAM("Received a set_pose request ("
                   "stamp: " << stamp << ", "
                   "x: " << position->x() << ", "
                   "y: " << position->y() << ", "

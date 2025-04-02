@@ -42,6 +42,7 @@
 
 #include <string>
 #include <vector>
+#include <spdlog_ros/logging.hpp>
 
 
 namespace fuse_constraints
@@ -97,7 +98,7 @@ AbsolutePose3DStampedEulerConstraint::AbsolutePose3DStampedEulerConstraint(
       angular_ordered_index  = 2;
       break;
     default:
-      ROS_FATAL_STREAM("angular index is set different than roll, pitch and yaw which should not be possible");
+      SPDLOG_ROS_FATAL_STREAM("angular index is set different than roll, pitch and yaw which should not be possible");
       return;
     }
     size_t final_index = position.size() + angular_ordered_index;

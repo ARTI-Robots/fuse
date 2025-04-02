@@ -5,6 +5,7 @@ set(build_depends
   fuse_msgs
   pluginlib
   roscpp
+  spdlog_ros
 )
 
 find_package(catkin REQUIRED COMPONENTS

@@ -53,6 +53,7 @@
 #include <algorithm>
 #include <memory>
 #include <string>
+#include <spdlog_ros/logging.hpp>
 
 
 namespace rviz
@@ -194,7 +195,7 @@ void RelativePose2DStampedConstraintVisual::setConstraint(
 
     if (rho[0] > squared_norm)
     {
-      ROS_WARN_STREAM_THROTTLE(10.0, "Detected invalid loss value of "
+      SPDLOG_ROS_WARN_STREAM_THROTTLE(NULL,1e10, "Detected invalid loss value of "
                                          << rho[0] << " greater than squared residual of " << squared_norm
                                          << " for constraint " << constraint_name(constraint) << " with loss type "
                                          << constraint.loss()->type()

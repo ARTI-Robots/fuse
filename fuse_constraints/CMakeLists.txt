@@ -8,6 +8,7 @@ set(build_depends
   geometry_msgs
   pluginlib
   roscpp
+  spdlog_ros
 )
 
 find_package(catkin REQUIRED COMPONENTS

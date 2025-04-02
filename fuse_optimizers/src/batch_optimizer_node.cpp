@@ -34,12 +34,21 @@
 #include <fuse_graphs/hash_graph.h>
 #include <fuse_optimizers/batch_optimizer.h>
 #include <ros/ros.h>
+#include <spdlog_ros/logging.hpp>
+#include <spdlog_ros/ros_sink.hpp>
 
 
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "batch_optimizer_node");
-  fuse_optimizers::BatchOptimizer optimizer(fuse_graphs::HashGraph::make_unique());
+  ros::NodeHandle nh;
+  ros::NodeHandle private_nh("~");
+  ros::NodeHandle logging_nh = private_nh;
+  auto ros_sink = std::make_shared<spdlog_ros::RosSink>(logging_nh);
+  auto logger = spdlog_ros::CreateAsyncLogger("BatchOptimizer", {ros_sink});
+  logger->set_level(SPDLOG_ROS_LEVEL_DEBUG);  // or INFO, WARN, etc.
+  spdlog::set_default_logger(logger);
+  fuse_optimizers::BatchOptimizer optimizer(fuse_graphs::HashGraph::make_unique(),nh,private_nh);
   ros::spin();
 
   return 0;

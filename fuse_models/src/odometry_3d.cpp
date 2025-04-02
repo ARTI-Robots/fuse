@@ -45,6 +45,7 @@
 
 #include <memory>
 #include <utility>
+#include <spdlog_ros/logging.hpp>
 
 
 // Register this sensor model with ROS as a plugin.
@@ -76,7 +77,7 @@ void Odometry3D::onInit()
       params_.linear_velocity_indices.empty() &&
       params_.angular_velocity_indices.empty())
   {
-    ROS_WARN_STREAM("No dimensions were specified. Data from topic " << ros::names::resolve(params_.topic) <<
+    SPDLOG_ROS_WARN_STREAM("No dimensions were specified. Data from topic " << ros::names::resolve(params_.topic) <<
                     " will be ignored.");
   }
 }
@@ -167,7 +168,7 @@ void Odometry3D::processDifferential(const geometry_msgs::PoseWithCovarianceStam
 
   if (!common::transformMessage(tf_buffer_, pose, *transformed_pose, params_.tf_timeout))
   {
-    ROS_WARN_STREAM_THROTTLE(5.0, "Cannot transform pose message with stamp "
+    SPDLOG_ROS_WARN_STREAM_THROTTLE(NULL,5e9, "Cannot transform pose message with stamp "
                                       << pose.header.stamp << " to pose target frame " << params_.pose_target_frame);
     return;
   }
@@ -186,7 +187,7 @@ void Odometry3D::processDifferential(const geometry_msgs::PoseWithCovarianceStam
 
     if (!common::transformMessage(tf_buffer_, twist, transformed_twist, params_.tf_timeout))
     {
-      ROS_WARN_STREAM_THROTTLE(5.0, "Cannot transform twist message with stamp " << twist.header.stamp
+      SPDLOG_ROS_WARN_STREAM_THROTTLE(NULL,5e9, "Cannot transform twist message with stamp " << twist.header.stamp
                                                                                  << " to twist target frame "
                                                                                  << params_.twist_target_frame);
     }

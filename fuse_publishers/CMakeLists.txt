@@ -11,6 +11,7 @@ set(build_depends
   tf2
   tf2_geometry_msgs
   tf2_ros
+  spdlog_ros
 )
 
 find_package(catkin REQUIRED COMPONENTS
