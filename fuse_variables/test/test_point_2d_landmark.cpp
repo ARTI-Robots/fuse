@@ -31,11 +31,6 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_core/serialization.h>
-#include <fuse_variables/point_2d_landmark.h>
-#include <fuse_variables/stamped.h>
-#include <ros/time.h>
-
 #include <ceres/autodiff_cost_function.h>
 #include <ceres/problem.h>
 #include <ceres/solver.h>
@@ -44,12 +39,16 @@
 #include <sstream>
 #include <vector>
 
-using fuse_variables::Point2DLandmark;
+#include <fuse_core/serialization.hpp>
+#include <fuse_variables/point_2d_landmark.hpp>
+#include <fuse_variables/stamped.hpp>
+#include <rclcpp/time.hpp>
 
+using fuse_variables::Point2DLandmark;
 
 TEST(Point2DLandmark, Type)
 {
-  Point2DLandmark variable(0);
+  Point2DLandmark const variable(0);
   EXPECT_EQ("fuse_variables::Point2DLandmark", variable.type());
 }
 
@@ -57,24 +56,25 @@ TEST(Point2DLandmark, UUID)
 {
   // Verify two positions with the same landmark ids produce the same uuids
   {
-    Point2DLandmark variable1(0);
-    Point2DLandmark variable2(0);
+    Point2DLandmark const variable1(0);
+    Point2DLandmark const variable2(0);
     EXPECT_EQ(variable1.uuid(), variable2.uuid());
   }
 
-    // Verify two positions with the different landmark ids  produce different uuids
+  // Verify two positions with the different landmark ids  produce different uuids
   {
-    Point2DLandmark variable1(0);
-    Point2DLandmark variable2(1);
+    Point2DLandmark const variable1(0);
+    Point2DLandmark const variable2(1);
     EXPECT_NE(variable1.uuid(), variable2.uuid());
   }
 }
 
 struct CostFunctor
 {
-  CostFunctor() {}
+  CostFunctor() = default;
 
-  template <typename T> bool operator()(const T* const x, T* residual) const
+  template <typename T>
+  bool operator()(const T* const x, T* residual) const
   {
     residual[0] = x[0] - T(3.0);
     residual[1] = x[1] + T(8.0);
@@ -94,18 +94,13 @@ TEST(Point2DLandmark, Optimization)
 
   // Build the problem.
   ceres::Problem problem;
-  problem.AddParameterBlock(
-    position.data(),
-    position.size());
+  problem.AddParameterBlock(position.data(), static_cast<int>(position.size()));
   std::vector<double*> parameter_blocks;
   parameter_blocks.push_back(position.data());
-  problem.AddResidualBlock(
-    cost_function,
-    nullptr,
-    parameter_blocks);
+  problem.AddResidualBlock(cost_function, nullptr, parameter_blocks);
 
   // Run the solver
-  ceres::Solver::Options options;
+  ceres::Solver::Options const options;
   ceres::Solver::Summary summary;
   ceres::Solve(options, &problem, &summary);
 
@@ -140,10 +135,4 @@ TEST(Point2DLandmark, Serialization)
   EXPECT_EQ(expected.uuid(), actual.uuid());
   EXPECT_EQ(expected.x(), actual.x());
   EXPECT_EQ(expected.y(), actual.y());
-}
-
-int main(int argc, char **argv)
-{
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

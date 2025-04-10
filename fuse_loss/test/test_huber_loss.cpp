@@ -31,13 +31,13 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_core/serialization.h>
-#include <fuse_loss/huber_loss.h>
-
 #include <ceres/autodiff_cost_function.h>
 #include <ceres/problem.h>
 #include <ceres/solver.h>
 #include <gtest/gtest.h>
+
+#include <fuse_core/serialization.hpp>
+#include <fuse_loss/huber_loss.hpp>
 
 TEST(HuberLoss, Constructor)
 {
@@ -49,7 +49,7 @@ TEST(HuberLoss, Constructor)
 
   // Create a loss with a parameter
   {
-    const double a{ 0.3 };
+    double const a{ 0.3 };
     fuse_loss::HuberLoss loss(a);
     ASSERT_EQ(a, loss.a());
   }
@@ -57,11 +57,12 @@ TEST(HuberLoss, Constructor)
 
 struct CostFunctor
 {
-  explicit CostFunctor(const double data)
-    : data(data)
-  {}
+  explicit CostFunctor(double const data) : data(data)
+  {
+  }
 
-  template <typename T> bool operator()(const T* const x, T* residual) const
+  template <typename T>
+  bool operator()(const T* const x, T* residual) const
   {
     residual[0] = x[0] - T(data);
     return true;
@@ -76,10 +77,10 @@ TEST(HuberLoss, Optimization)
   double x{ 5.0 };
 
   // Create a simple inlier constraint
-  const double inlier{ 1.0 };
+  double const inlier{ 1.0 };
 
   // Create a simple outlier constraint
-  const double outlier{ 10.0 };
+  double const outlier{ 10.0 };
   ceres::CostFunction* cost_function_outlier =
       new ceres::AutoDiffCostFunction<CostFunctor, 1, 1>(new CostFunctor(outlier));
 
@@ -95,20 +96,16 @@ TEST(HuberLoss, Optimization)
   const size_t num_inliers{ 1000 };
   for (size_t i = 0; i < num_inliers; ++i)
   {
-    problem.AddResidualBlock(
-      new ceres::AutoDiffCostFunction<CostFunctor, 1, 1>(new CostFunctor(inlier)),
-      loss.lossFunction(),  // A nullptr here would produce a slightly better solution
-      &x);
+    problem.AddResidualBlock(new ceres::AutoDiffCostFunction<CostFunctor, 1, 1>(new CostFunctor(inlier)),
+                             loss.lossFunction(),  // A nullptr here would produce a slightly better solution
+                             &x);
   }
 
   // Add outlier constraints
   const size_t num_outliers{ 9 };
   for (size_t i = 0; i < num_outliers; ++i)
   {
-    problem.AddResidualBlock(
-      cost_function_outlier,
-      loss.lossFunction(),
-      &x);
+    problem.AddResidualBlock(cost_function_outlier, loss.lossFunction(), &x);
   }
 
   // Run the solver
@@ -137,7 +134,7 @@ TEST(HuberLoss, Optimization)
 TEST(HuberLoss, Serialization)
 {
   // Construct a loss
-  const double a{ 0.3 };
+  double const a{ 0.3 };
   fuse_loss::HuberLoss expected(a);
 
   // Serialize the loss into an archive
@@ -159,8 +156,8 @@ TEST(HuberLoss, Serialization)
   EXPECT_NE(nullptr, actual.lossFunction());
 
   // Test inlier (s <= a*a)
-  const double s = 0.95 * a * a;
-  double rho[3] = {0.0};
+  double const s = 0.95 * a * a;
+  double rho[3] = { 0.0 };
   actual.lossFunction()->Evaluate(s, rho);
 
   EXPECT_EQ(s, rho[0]);
@@ -168,7 +165,7 @@ TEST(HuberLoss, Serialization)
   EXPECT_EQ(0.0, rho[2]);
 
   // Test outlier
-  const double s_outlier = 1.05 * a * a;
+  double const s_outlier = 1.05 * a * a;
   actual.lossFunction()->Evaluate(s_outlier, rho);
 
   // In the outlier region rho() satisfies:
@@ -181,10 +178,4 @@ TEST(HuberLoss, Serialization)
   EXPECT_GT(s_outlier, rho[0]);
   EXPECT_GT(1.0, rho[1]);
   EXPECT_GT(0.0, rho[2]);
-}
-
-int main(int argc, char** argv)
-{
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

@@ -2,6 +2,58 @@
 Changelog for package fuse_viz
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+1.2.0 (2024-05-02)
+------------------
+
+1.1.1 (2024-05-02)
+------------------
+
+1.1.0 (2024-04-20)
+------------------
+* Port support for Ceres 2.1.0 Manifold class into ROS 2 Rolling (`#366 <https://github.com/locusrobotics/fuse/issues/366>`_)
+  * Support gcc12 and ceres 2.1.0
+  * Add support for the Manifold class when using Ceres Solver version 2.1.0 and above
+  * General clean up for Ceres 2.2.0 support
+  * Updated serialization support to be backwards compatible with previously serialized files
+  * Formatting changes required for ROS 2 Rolling / Ubuntu Noble
+* Contributors: Stephen Williams
+
+1.0.1 (2023-03-03)
+------------------
+
+1.0.0 (2023-03-03)
+------------------
+* Fix fuse viz crash (`#312 <https://github.com/locusrobotics/fuse/issues/312>`_)
+* fuse -> ROS 2 : Doc Generation (`#278 <https://github.com/locusrobotics/fuse/issues/278>`_)
+  * Port doc generation and fix package.xml for linting
+  * Fix small bugs in package.xml
+  * Use default rosdoc2 settings
+  * Use default rosdoc2 settings
+  * Update fuse_doc for rosdoc2
+  ---------
+  Co-authored-by: Shane Loretz <sloretz@google.com>
+* fuse -> ROS 2 fuse_viz : Linting (`#306 <https://github.com/locusrobotics/fuse/issues/306>`_)
+* ROS 2 port of fuse_viz (`#301 <https://github.com/locusrobotics/fuse/issues/301>`_)
+  * Initial attempt at porting fuse_viz
+  * Make sure suitesparse can be found downstream
+  * Plugin library names can't have lib/ prefix
+  * Plugin library names can't have lib/ prefix
+  * Add lint tests (they currently fail)
+* fuse -> ROS 2 fuse_constraints : Linting (`#298 <https://github.com/locusrobotics/fuse/issues/298>`_)
+* fuse -> ROS 2 fuse_variables: Linting (`#296 <https://github.com/locusrobotics/fuse/issues/296>`_)
+  * Migrate to .hpp files
+  * Create redirection headers
+  * Make xmllint and uncrustify happy
+  * Wrap most comment lines
+  * Satisfy cpplint
+* fuse -> ROS 2 fuse_core: Linting (`#292 <https://github.com/locusrobotics/fuse/issues/292>`_)
+* fuse -> ROS 2 : Port Logging (`#279 <https://github.com/locusrobotics/fuse/issues/279>`_)
+  Co-authored-by: Tom Moore <tmoore@locusrobotics.com>
+* fuse -> ROS 2 fuse_msgs : Port package and ignore unported packages for now (`#277 <https://github.com/locusrobotics/fuse/issues/277>`_)
+  Co-authored-by: Tom Moore <tmoore@locusrobotics.com>
+* Adding doxygen to all packages (`#241 <https://github.com/locusrobotics/fuse/issues/241>`_)
+* Contributors: Shane Loretz, Tom Moore, methylDragon
+
 0.4.2 (2021-07-20)
 ------------------
 * Adding roslint dependency to fuse_viz (`#231 <https://github.com/locusrobotics/fuse/issues/231>`_)

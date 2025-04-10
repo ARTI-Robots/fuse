@@ -31,53 +31,39 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_models/unicycle_2d_state_kinematic_constraint.h>
-#include <fuse_models/unicycle_2d_state_cost_function.h>
-
-#include <fuse_variables/acceleration_linear_2d_stamped.h>
-#include <fuse_variables/orientation_2d_stamped.h>
-#include <fuse_variables/position_2d_stamped.h>
-#include <fuse_variables/velocity_angular_2d_stamped.h>
-#include <fuse_variables/velocity_linear_2d_stamped.h>
-#include <pluginlib/class_list_macros.h>
-
-#include <boost/serialization/export.hpp>
 #include <Eigen/Dense>
 
 #include <ostream>
 #include <string>
 
+#include <boost/serialization/export.hpp>
+#include <fuse_models/unicycle_2d_state_cost_function.hpp>
+#include <fuse_models/unicycle_2d_state_kinematic_constraint.hpp>
+#include <fuse_variables/acceleration_linear_2d_stamped.hpp>
+#include <fuse_variables/orientation_2d_stamped.hpp>
+#include <fuse_variables/position_2d_stamped.hpp>
+#include <fuse_variables/velocity_angular_2d_stamped.hpp>
+#include <fuse_variables/velocity_linear_2d_stamped.hpp>
+#include <pluginlib/class_list_macros.hpp>
 
 namespace fuse_models
 {
 
 Unicycle2DStateKinematicConstraint::Unicycle2DStateKinematicConstraint(
-  const std::string& source,
-  const fuse_variables::Position2DStamped& position1,
-  const fuse_variables::Orientation2DStamped& yaw1,
-  const fuse_variables::VelocityLinear2DStamped& linear_velocity1,
-  const fuse_variables::VelocityAngular2DStamped& yaw_velocity1,
-  const fuse_variables::AccelerationLinear2DStamped& linear_acceleration1,
-  const fuse_variables::Position2DStamped& position2,
-  const fuse_variables::Orientation2DStamped& yaw2,
-  const fuse_variables::VelocityLinear2DStamped& linear_velocity2,
-  const fuse_variables::VelocityAngular2DStamped& yaw_velocity2,
-  const fuse_variables::AccelerationLinear2DStamped& linear_acceleration2,
-  const fuse_core::Matrix8d& covariance) :
-    fuse_core::Constraint(
-      source,
-      {position1.uuid(),
-       yaw1.uuid(),
-       linear_velocity1.uuid(),
-       yaw_velocity1.uuid(),
-       linear_acceleration1.uuid(),
-       position2.uuid(),
-       yaw2.uuid(),
-       linear_velocity2.uuid(),
-       yaw_velocity2.uuid(),
-       linear_acceleration2.uuid()}),  // NOLINT
-    dt_((position2.stamp() - position1.stamp()).toSec()),
-    sqrt_information_(covariance.inverse().llt().matrixU())
+    std::string const& source, fuse_variables::Position2DStamped const& position1,
+    fuse_variables::Orientation2DStamped const& yaw1, fuse_variables::VelocityLinear2DStamped const& linear_velocity1,
+    fuse_variables::VelocityAngular2DStamped const& yaw_velocity1,
+    fuse_variables::AccelerationLinear2DStamped const& linear_acceleration1,
+    fuse_variables::Position2DStamped const& position2, fuse_variables::Orientation2DStamped const& yaw2,
+    fuse_variables::VelocityLinear2DStamped const& linear_velocity2,
+    fuse_variables::VelocityAngular2DStamped const& yaw_velocity2,
+    fuse_variables::AccelerationLinear2DStamped const& linear_acceleration2, fuse_core::Matrix8d const& covariance)
+  : fuse_core::Constraint(source, { position1.uuid(), yaw1.uuid(), linear_velocity1.uuid(), yaw_velocity1.uuid(),
+                                    linear_acceleration1.uuid(), position2.uuid(), yaw2.uuid(), linear_velocity2.uuid(),
+                                    yaw_velocity2.uuid(), linear_acceleration2.uuid() })
+  ,  // NOLINT
+  dt_((position2.stamp() - position1.stamp()).seconds())
+  , sqrt_information_(covariance.inverse().llt().matrixU())
 {
 }
 
@@ -102,15 +88,15 @@ void Unicycle2DStateKinematicConstraint::print(std::ostream& stream) const
 
 ceres::CostFunction* Unicycle2DStateKinematicConstraint::costFunction() const
 {
-  // Here we return a cost function that computes the analytic derivatives/jacobians, but we could use automatic
-  // differentiation as follows:
+  // Here we return a cost function that computes the analytic derivatives/jacobians, but we could
+  // use automatic differentiation as follows:
   //
-  // return new ceres::AutoDiffCostFunction<Unicycle2DStateCostFunctor, 8, 2, 1, 2, 1, 2, 2, 1, 2, 1, 2>(
-  //   new Unicycle2DStateCostFunctor(dt_, sqrt_information_));
+  // return new ceres::AutoDiffCostFunction<Unicycle2DStateCostFunctor, 8, 2, 1, 2, 1, 2, 2, 1, 2,
+  // 1, 2>( new Unicycle2DStateCostFunctor(dt_, sqrt_information_));
   //
   // which requires:
   //
-  // #include <fuse_models/unicycle_2d_state_cost_functor.h>
+  // #include <fuse_models/unicycle_2d_state_cost_functor.hpp>
   return new Unicycle2DStateCostFunction(dt_, sqrt_information_);
 }
 

@@ -1,26 +1,30 @@
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.5)
 project(fuse_msgs)
 
-find_package(catkin REQUIRED COMPONENTS
-  message_generation
-  std_msgs
-)
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
 
-add_message_files(
-  DIRECTORY
-    msg
-  FILES
-    SerializedGraph.msg
-    SerializedTransaction.msg
-)
+find_package(ament_cmake REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(geometry_msgs REQUIRED)
 
-generate_messages(
+set(MSG_FILES "msg/SerializedGraph.msg" "msg/SerializedTransaction.msg")
+
+set(SRV_FILES "srv/SetGraph.srv" "srv/SetPose.srv" "srv/SetPoseDeprecated.srv")
+
+rosidl_generate_interfaces(
+  ${PROJECT_NAME}
+  ${MSG_FILES}
+  ${SRV_FILES}
   DEPENDENCIES
-    std_msgs
-)
+  std_msgs
+  geometry_msgs
+  ADD_LINTER_TESTS)
 
-catkin_package(
-  CATKIN_DEPENDS
-    message_runtime
-    std_msgs
-)
+ament_export_dependencies(rosidl_default_runtime)
+ament_package()

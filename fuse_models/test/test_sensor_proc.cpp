@@ -3,12 +3,12 @@
  * Unauthorized copying of this file, via any medium, is strictly prohibited
  * Proprietary and confidential
  ***************************************************************************/
-#include <fuse_models/common/sensor_proc.h>
-
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include <vector>
+
+#include <fuse_models/common/sensor_proc.hpp>
 
 namespace fm_common = fuse_models::common;
 
@@ -19,7 +19,7 @@ TEST(TestSuite, mergeXYPositionAndYawOrientationIndices)
 
   const size_t orientation_offset = 2;
 
-  const auto merged_indices = fm_common::mergeIndices(position_indices, orientation_indices, orientation_offset);
+  auto const merged_indices = fm_common::mergeIndices(position_indices, orientation_indices, orientation_offset);
 
   EXPECT_EQ(position_indices.size() + orientation_indices.size(), merged_indices.size());
   EXPECT_THAT(position_indices,
@@ -34,7 +34,7 @@ TEST(TestSuite, mergeXPositionAndYawOrientationIndices)
 
   const size_t orientation_offset = 2;
 
-  const auto merged_indices = fm_common::mergeIndices(position_indices, orientation_indices, orientation_offset);
+  auto const merged_indices = fm_common::mergeIndices(position_indices, orientation_indices, orientation_offset);
 
   EXPECT_EQ(position_indices.size() + orientation_indices.size(), merged_indices.size());
   EXPECT_THAT(position_indices,
@@ -49,7 +49,7 @@ TEST(TestSuite, mergeXYPositionAndEmptyOrientationIndices)
 
   const size_t orientation_offset = 2;
 
-  const auto merged_indices = fm_common::mergeIndices(position_indices, orientation_indices, orientation_offset);
+  auto const merged_indices = fm_common::mergeIndices(position_indices, orientation_indices, orientation_offset);
 
   EXPECT_EQ(position_indices.size(), merged_indices.size());
   EXPECT_THAT(position_indices, testing::ElementsAreArray(merged_indices));
@@ -62,7 +62,7 @@ TEST(TestSuite, mergeEmptyPositionAndYawOrientationIndices)
 
   const size_t orientation_offset = 2;
 
-  const auto merged_indices = fm_common::mergeIndices(position_indices, orientation_indices, orientation_offset);
+  auto const merged_indices = fm_common::mergeIndices(position_indices, orientation_indices, orientation_offset);
 
   EXPECT_EQ(orientation_indices.size(), merged_indices.size());
   EXPECT_EQ(orientation_indices.back() + orientation_offset, merged_indices.back());
@@ -75,7 +75,7 @@ TEST(TestSuite, mergeEmptyPositionAndEmptyOrientationIndices)
 
   const size_t orientation_offset = 2;
 
-  const auto merged_indices = fm_common::mergeIndices(position_indices, orientation_indices, orientation_offset);
+  auto const merged_indices = fm_common::mergeIndices(position_indices, orientation_indices, orientation_offset);
 
   EXPECT_TRUE(merged_indices.empty());
 }
@@ -93,17 +93,13 @@ TEST(TestSuite, populatePartialMeasurementXYPositionYawOrientation)
 
   const size_t orientation_offset = 2;
 
-  const auto merged_indices = fm_common::mergeIndices(position_indices, orientation_indices, orientation_offset);
+  auto const merged_indices = fm_common::mergeIndices(position_indices, orientation_indices, orientation_offset);
 
   fuse_core::VectorXd pose_mean_partial(position_indices.size() + orientation_indices.size());
   fuse_core::MatrixXd pose_covariance_partial(pose_mean_partial.rows(), pose_mean_partial.rows());
 
-  fm_common::populatePartialMeasurement(
-    pose_mean,
-    pose_covariance,
-    merged_indices,
-    pose_mean_partial,
-    pose_covariance_partial);
+  fm_common::populatePartialMeasurement(pose_mean, pose_covariance, merged_indices, pose_mean_partial,
+                                        pose_covariance_partial);
 
   EXPECT_EQ(pose_mean, pose_mean_partial);
   EXPECT_EQ(pose_covariance, pose_covariance_partial);
@@ -122,20 +118,16 @@ TEST(TestSuite, populatePartialMeasurementXPositionYawOrientation)
 
   const size_t orientation_offset = 2;
 
-  const auto merged_indices = fm_common::mergeIndices(position_indices, orientation_indices, orientation_offset);
+  auto const merged_indices = fm_common::mergeIndices(position_indices, orientation_indices, orientation_offset);
 
   fuse_core::VectorXd pose_mean_partial(position_indices.size() + orientation_indices.size());
   fuse_core::MatrixXd pose_covariance_partial(pose_mean_partial.rows(), pose_mean_partial.rows());
 
-  fm_common::populatePartialMeasurement(
-    pose_mean,
-    pose_covariance,
-    merged_indices,
-    pose_mean_partial,
-    pose_covariance_partial);
+  fm_common::populatePartialMeasurement(pose_mean, pose_covariance, merged_indices, pose_mean_partial,
+                                        pose_covariance_partial);
 
-  // Eigen indexing is only supported in the latest stable versions, so we avoid using that feature for backwards
-  // compatibility
+  // Eigen indexing is only supported in the latest stable versions, so we avoid using that feature
+  // for backwards compatibility
   const std::vector<int> expected_merged_indices{ 0, 2 };
 
   EXPECT_THAT(expected_merged_indices, testing::ElementsAreArray(merged_indices));
@@ -165,17 +157,13 @@ TEST(TestSuite, populatePartialMeasurementEmptyPositionYawOrientation)
 
   const size_t orientation_offset = 2;
 
-  const auto merged_indices = fm_common::mergeIndices(position_indices, orientation_indices, orientation_offset);
+  auto const merged_indices = fm_common::mergeIndices(position_indices, orientation_indices, orientation_offset);
 
   fuse_core::VectorXd pose_mean_partial(position_indices.size() + orientation_indices.size());
   fuse_core::MatrixXd pose_covariance_partial(pose_mean_partial.rows(), pose_mean_partial.rows());
 
-  fm_common::populatePartialMeasurement(
-    pose_mean,
-    pose_covariance,
-    merged_indices,
-    pose_mean_partial,
-    pose_covariance_partial);
+  fm_common::populatePartialMeasurement(pose_mean, pose_covariance, merged_indices, pose_mean_partial,
+                                        pose_covariance_partial);
 
   EXPECT_EQ(pose_mean.tail<1>(), pose_mean_partial);
   EXPECT_EQ(pose_covariance.bottomRightCorner(1, 1), pose_covariance_partial);
@@ -194,17 +182,13 @@ TEST(TestSuite, populatePartialMeasurementXYPositionEmptyOrientation)
 
   const size_t orientation_offset = 2;
 
-  const auto merged_indices = fm_common::mergeIndices(position_indices, orientation_indices, orientation_offset);
+  auto const merged_indices = fm_common::mergeIndices(position_indices, orientation_indices, orientation_offset);
 
   fuse_core::VectorXd pose_mean_partial(position_indices.size() + orientation_indices.size());
   fuse_core::MatrixXd pose_covariance_partial(pose_mean_partial.rows(), pose_mean_partial.rows());
 
-  fm_common::populatePartialMeasurement(
-    pose_mean,
-    pose_covariance,
-    merged_indices,
-    pose_mean_partial,
-    pose_covariance_partial);
+  fm_common::populatePartialMeasurement(pose_mean, pose_covariance, merged_indices, pose_mean_partial,
+                                        pose_covariance_partial);
 
   EXPECT_EQ(pose_mean.head<2>(), pose_mean_partial);
   EXPECT_EQ(pose_covariance.topLeftCorner(2, 2), pose_covariance_partial);
@@ -223,24 +207,14 @@ TEST(TestSuite, populatePartialMeasurementEmptyPositionEmptyOrientation)
 
   const size_t orientation_offset = 2;
 
-  const auto merged_indices = fm_common::mergeIndices(position_indices, orientation_indices, orientation_offset);
+  auto const merged_indices = fm_common::mergeIndices(position_indices, orientation_indices, orientation_offset);
 
   fuse_core::VectorXd pose_mean_partial(position_indices.size() + orientation_indices.size());
   fuse_core::MatrixXd pose_covariance_partial(pose_mean_partial.rows(), pose_mean_partial.rows());
 
-  fm_common::populatePartialMeasurement(
-    pose_mean,
-    pose_covariance,
-    merged_indices,
-    pose_mean_partial,
-    pose_covariance_partial);
+  fm_common::populatePartialMeasurement(pose_mean, pose_covariance, merged_indices, pose_mean_partial,
+                                        pose_covariance_partial);
 
   EXPECT_EQ(0, pose_mean_partial.size());
   EXPECT_EQ(0, pose_covariance_partial.size());
-}
-
-int main(int argc, char** argv)
-{
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

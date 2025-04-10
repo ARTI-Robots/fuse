@@ -31,13 +31,10 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_core/async_publisher.h>
-#include <ros/ros.h>
-
 #include <gtest/gtest.h>
 
-#include <set>
-
+#include <fuse_core/async_publisher.hpp>
+#include <rclcpp/rclcpp.hpp>
 
 /**
  * @brief Derived AsyncPublisher used to verify the functions get called when expected
@@ -45,20 +42,16 @@
 class MyPublisher : public fuse_core::AsyncPublisher
 {
 public:
-  MyPublisher() :
-    fuse_core::AsyncPublisher(1),
-    callback_processed(false),
-    initialized(false)
+  MyPublisher() : fuse_core::AsyncPublisher(1), callback_processed(false), initialized(false)
   {
   }
 
   virtual ~MyPublisher() = default;
 
-  void notifyCallback(
-    fuse_core::Transaction::ConstSharedPtr /*transaction*/,
-    fuse_core::Graph::ConstSharedPtr /*graph*/)
+  void notifyCallback(fuse_core::Transaction::ConstSharedPtr /*transaction*/,
+                      fuse_core::Graph::ConstSharedPtr /*graph*/) override
   {
-    ros::Duration(1.0).sleep();
+    rclcpp::sleep_for(std::chrono::milliseconds(10));
     callback_processed = true;
   }
 
@@ -71,43 +64,66 @@ public:
   bool initialized;
 };
 
-TEST(AsyncPublisher, OnInit)
+class TestAsyncPublisher : public ::testing::Test
 {
-  MyPublisher publisher;
-  publisher.initialize("my_publisher");
-  EXPECT_TRUE(publisher.initialized);
-}
-
-TEST(AsyncPublisher, notifyCallback)
-{
-  MyPublisher publisher;
-  publisher.initialize("my_publisher");
-
-  // Execute the notify() method in this thread. This should push a call to MyPublisher::notifyCallback()
-  // into MyPublisher's callback queue, which will get executed by MyPublisher's async spinner.
-  // There is a time delay there. So, this call should return almost immediately, then we have to wait
-  // a bit before the "callback_processed" flag gets flipped.
-  fuse_core::Transaction::ConstSharedPtr transaction;  // nullptr...which is fine because we do not actually use it
-  fuse_core::Graph::ConstSharedPtr graph;  // nullptr...which is fine because we do not actually use it
-  publisher.notify(transaction, graph);
-  EXPECT_FALSE(publisher.callback_processed);
-  ros::Time wait_time_elapsed = ros::Time::now() + ros::Duration(10.0);
-  while (!publisher.callback_processed && ros::Time::now() < wait_time_elapsed)
+public:
+  void SetUp()
   {
-    ros::Duration(0.1).sleep();
+    rclcpp::init(0, nullptr);
   }
-  EXPECT_TRUE(publisher.callback_processed);
+
+  void TearDown()
+  {
+    rclcpp::shutdown();
+  }
+};
+
+TEST_F(TestAsyncPublisher, OnInit)
+{
+  for (int i = 0; i < 50; i++)
+  {
+    auto node = rclcpp::Node::make_shared("test_async_pub_node");
+    MyPublisher publisher;
+    publisher.initialize(*node, "my_publisher_" + std::to_string(i));
+    EXPECT_TRUE(publisher.initialized);
+  }
 }
 
-int main(int argc, char** argv)
+TEST_F(TestAsyncPublisher, DoubleInit)
 {
-  testing::InitGoogleTest(&argc, argv);
-  ros::init(argc, argv, "test_async_publisher");
+  auto node = rclcpp::Node::make_shared("test_async_pub_node");
+  MyPublisher publisher;
+  publisher.initialize(*node, "my_publisher");
+  EXPECT_TRUE(publisher.initialized);
+  EXPECT_THROW(publisher.initialize(*node, "test"), std::runtime_error);
+}
 
-  ros::AsyncSpinner spinner(1);
-  spinner.start();
-  int ret = RUN_ALL_TESTS();
-  spinner.stop();
-  ros::shutdown();
-  return ret;
+TEST_F(TestAsyncPublisher, notifyCallback)
+{
+  auto node = rclcpp::Node::make_shared("test_async_pub_node");
+  MyPublisher publisher;
+  publisher.initialize(*node, "my_publisher");
+
+  // Execute the notify() method in this thread. This should push a call to
+  // MyPublisher::notifyCallback() into MyPublisher's callback queue, which will get executed by
+  // MyPublisher's async spinner. There is a time delay there. So, this call should return almost
+  // immediately, then we have to wait a bit before the "callback_processed" flag gets flipped.
+  fuse_core::Transaction::ConstSharedPtr transaction;  // nullptr is ok as we don't actually use it
+  fuse_core::Graph::ConstSharedPtr graph;              // nullptr is ok as we don't actually use it
+  auto clock = rclcpp::Clock(RCL_SYSTEM_TIME);
+
+  // Test for multiple cycles of notify to be sure
+  for (int i = 0; i < 50; i++)
+  {
+    publisher.callback_processed = false;
+    publisher.notify(transaction, graph);
+    EXPECT_FALSE(publisher.callback_processed);
+
+    rclcpp::Time wait_time_elapsed = clock.now() + rclcpp::Duration::from_seconds(10);
+    while (!publisher.callback_processed && clock.now() < wait_time_elapsed)
+    {
+      rclcpp::sleep_for(std::chrono::milliseconds(10));
+    }
+    EXPECT_TRUE(publisher.callback_processed);
+  }
 }

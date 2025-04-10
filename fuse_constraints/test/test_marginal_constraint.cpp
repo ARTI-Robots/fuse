@@ -31,25 +31,27 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_constraints/marginal_constraint.h>
-#include <fuse_core/eigen.h>
-#include <fuse_core/eigen_gtest.h>
-#include <fuse_core/serialization.h>
-#include <fuse_variables/orientation_3d_stamped.h>
-#include <fuse_variables/position_2d_stamped.h>
-#include <ros/time.h>
-
 #include <gtest/gtest.h>
 
+#include <fstream>
 #include <memory>
 #include <vector>
 
+#include <fuse_constraints/marginal_constraint.hpp>
+#include <fuse_core/ceres_macros.hpp>
+#include <fuse_core/eigen.hpp>
+#include <fuse_core/eigen_gtest.hpp>
+#include <fuse_core/manifold_adapter.hpp>
+#include <fuse_core/serialization.hpp>
+#include <fuse_variables/orientation_3d_stamped.hpp>
+#include <fuse_variables/position_2d_stamped.hpp>
+#include <rclcpp/time.hpp>
 
 TEST(MarginalConstraint, OneVariable)
 {
   // Create a marginal constraint with one variable, no local parameterizations
   std::vector<fuse_variables::Position2DStamped> variables;
-  fuse_variables::Position2DStamped x1(ros::Time(1, 0));
+  fuse_variables::Position2DStamped x1(rclcpp::Time(1, 0));
   x1.x() = 1.0;
   x1.y() = 2.0;
   variables.push_back(x1);
@@ -62,13 +64,8 @@ TEST(MarginalConstraint, OneVariable)
   fuse_core::Vector1d b;
   b << 3.0;
 
-  auto constraint = fuse_constraints::MarginalConstraint(
-    "test",
-    variables.begin(),
-    variables.end(),
-    A.begin(),
-    A.end(),
-    b);
+  auto constraint =
+      fuse_constraints::MarginalConstraint("test", variables.begin(), variables.end(), A.begin(), A.end(), b);
 
   auto cost_function = constraint.costFunction();
 
@@ -77,10 +74,10 @@ TEST(MarginalConstraint, OneVariable)
   x1.y() = 6.0;
 
   // Compute the actual residuals and jacobians
-  std::vector<const double*> variable_values = {x1.data()};
+  std::vector<double const*> variable_values = { x1.data() };
   fuse_core::Vector1d actual_residuals;
   fuse_core::MatrixXd actual_jacobian1(1, 2);
-  std::vector<double*> actual_jacobians = {actual_jacobian1.data()};
+  std::vector<double*> actual_jacobians = { actual_jacobian1.data() };
   cost_function->Evaluate(variable_values.data(), actual_residuals.data(), actual_jacobians.data());
 
   // Define the expected residuals and jacobians
@@ -99,12 +96,12 @@ TEST(MarginalConstraint, TwoVariables)
 {
   // Create a marginal constraint with one variable, no local parameterizations
   std::vector<fuse_variables::Position2DStamped> variables;
-  fuse_variables::Position2DStamped x1(ros::Time(1, 0));
+  fuse_variables::Position2DStamped x1(rclcpp::Time(1, 0));
   x1.x() = 1.0;
   x1.y() = 2.0;
   variables.push_back(x1);
 
-  fuse_variables::Position2DStamped x2(ros::Time(2, 0));
+  fuse_variables::Position2DStamped x2(rclcpp::Time(2, 0));
   x2.x() = 3.0;
   x2.y() = 4.0;
   variables.push_back(x2);
@@ -121,13 +118,8 @@ TEST(MarginalConstraint, TwoVariables)
   fuse_core::Vector1d b;
   b << 9.0;
 
-  auto constraint = fuse_constraints::MarginalConstraint(
-    "test",
-    variables.begin(),
-    variables.end(),
-    A.begin(),
-    A.end(),
-    b);
+  auto constraint =
+      fuse_constraints::MarginalConstraint("test", variables.begin(), variables.end(), A.begin(), A.end(), b);
 
   auto cost_function = constraint.costFunction();
 
@@ -139,16 +131,18 @@ TEST(MarginalConstraint, TwoVariables)
   x2.y() = 18.0;
 
   // Compute the actual residuals and jacobians
-  std::vector<const double*> variable_values = {x1.data(), x2.data()};
+  std::vector<double const*> variable_values = { x1.data(), x2.data() };
   fuse_core::Vector1d actual_residuals;
   fuse_core::MatrixXd actual_jacobian1(1, 2);
   fuse_core::MatrixXd actual_jacobian2(1, 2);
-  std::vector<double*> actual_jacobians = {actual_jacobian1.data(), actual_jacobian2.data()};
+  std::vector<double*> actual_jacobians = { actual_jacobian1.data(), actual_jacobian2.data() };
   cost_function->Evaluate(variable_values.data(), actual_residuals.data(), actual_jacobians.data());
 
   // Define the expected residuals and jacobians
   fuse_core::Vector1d expected_residuals;
-  expected_residuals << 310.0;  // 5 * (10 - 1) + 6 * (12 - 2)   +   7 * (15 - 3) + 8 * (18 - 4)   +   9
+  expected_residuals << 310.0;  //   5 * (10 - 1) + 6 * (12 - 2)
+                                // + 7 * (15 - 3) + 8 * (18 - 4)
+                                // + 9
   fuse_core::MatrixXd expected_jacobian1(1, 2);
   expected_jacobian1 << 5.0, 6.0;  // Just A1
   fuse_core::MatrixXd expected_jacobian2(1, 2);
@@ -165,7 +159,7 @@ TEST(MarginalConstraint, LocalParameterization)
 {
   // Create a marginal constraint with one variable with a local parameterizations
   std::vector<fuse_variables::Orientation3DStamped> variables;
-  fuse_variables::Orientation3DStamped x1(ros::Time(1, 0));
+  fuse_variables::Orientation3DStamped x1(rclcpp::Time(1, 0));
   x1.w() = 0.842614977;
   x1.x() = 0.2;
   x1.y() = 0.3;
@@ -180,13 +174,8 @@ TEST(MarginalConstraint, LocalParameterization)
   fuse_core::Vector1d b;
   b << 8.0;
 
-  auto constraint = fuse_constraints::MarginalConstraint(
-    "test",
-    variables.begin(),
-    variables.end(),
-    A.begin(),
-    A.end(),
-    b);
+  auto constraint =
+      fuse_constraints::MarginalConstraint("test", variables.begin(), variables.end(), A.begin(), A.end(), b);
   auto cost_function = constraint.costFunction();
 
   // Update the variable value
@@ -197,10 +186,10 @@ TEST(MarginalConstraint, LocalParameterization)
   x1.z() = 0.526043;
 
   // Compute the actual residuals and jacobians
-  std::vector<const double*> variable_values = {x1.data()};
+  std::vector<double const*> variable_values = { x1.data() };
   fuse_core::Vector1d actual_residuals;
   fuse_core::MatrixXd actual_jacobian1(1, 4);
-  std::vector<double*> actual_jacobians = {actual_jacobian1.data()};
+  std::vector<double*> actual_jacobians = { actual_jacobian1.data() };
   cost_function->Evaluate(variable_values.data(), actual_residuals.data(), actual_jacobians.data());
 
   // Define the expected residuals and jacobians
@@ -223,7 +212,7 @@ TEST(MarginalConstraint, Serialization)
 {
   // Construct a constraint
   std::vector<fuse_variables::Orientation3DStamped> variables;
-  fuse_variables::Orientation3DStamped x1(ros::Time(1, 0));
+  fuse_variables::Orientation3DStamped x1(rclcpp::Time(1, 0));
   x1.w() = 0.842614977;
   x1.x() = 0.2;
   x1.y() = 0.3;
@@ -238,13 +227,8 @@ TEST(MarginalConstraint, Serialization)
   fuse_core::Vector1d b;
   b << 8.0;
 
-  auto expected = fuse_constraints::MarginalConstraint(
-    "test",
-    variables.begin(),
-    variables.end(),
-    A.begin(),
-    A.end(),
-    b);
+  auto expected =
+      fuse_constraints::MarginalConstraint("test", variables.begin(), variables.end(), A.begin(), A.end(), b);
 
   // Serialize the constraint into an archive
   std::stringstream stream;
@@ -267,6 +251,7 @@ TEST(MarginalConstraint, Serialization)
   EXPECT_EQ(expected.b(), actual.b());
   EXPECT_EQ(expected.x_bar(), actual.x_bar());
   // The shared ptrs will not be the same instances, but they should point to the same types
+#if !CERES_SUPPORTS_MANIFOLDS
   using ExpectedLocalParam = fuse_variables::Orientation3DLocalParameterization;
   ASSERT_EQ(expected.localParameterizations().size(), actual.localParameterizations().size());
   for (auto i = 0u; i < actual.localParameterizations().size(); ++i)
@@ -274,10 +259,70 @@ TEST(MarginalConstraint, Serialization)
     auto actual_derived = std::dynamic_pointer_cast<ExpectedLocalParam>(actual.localParameterizations()[i]);
     EXPECT_TRUE(static_cast<bool>(actual_derived));
   }
+#else
+  using ExpectedManifold = fuse_variables::Orientation3DManifold;
+  ASSERT_EQ(expected.manifolds().size(), actual.manifolds().size());
+  for (auto i = 0u; i < actual.manifolds().size(); ++i)
+  {
+    auto actual_derived = std::dynamic_pointer_cast<ExpectedManifold>(actual.manifolds()[i]);
+    EXPECT_TRUE(static_cast<bool>(actual_derived));
+  }
+#endif
 }
 
-int main(int argc, char **argv)
+#if CERES_SUPPORTS_MANIFOLDS
+TEST(MarginalConstraint, LegacyDeserialization)
 {
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
+  // Test deserializing a marginal constraint generated from an older version
+  // of Ceres Solver
+
+  std::vector<fuse_variables::Orientation3DStamped> variables;
+  fuse_variables::Orientation3DStamped x1(rclcpp::Time(1, 0));
+  x1.w() = 0.842614977;
+  x1.x() = 0.2;
+  x1.y() = 0.3;
+  x1.z() = 0.4;
+  variables.push_back(x1);
+
+  std::vector<fuse_core::MatrixXd> A;
+  fuse_core::MatrixXd A1(1, 3);
+  A1 << 5.0, 6.0, 7.0;
+  A.push_back(A1);
+
+  fuse_core::Vector1d b;
+  b << 8.0;
+
+  auto expected =
+      fuse_constraints::MarginalConstraint("test", variables.begin(), variables.end(), A.begin(), A.end(), b);
+
+  // The legacy serialization file was generated using the following code:
+  // {
+  //   std::ofstream output_file("legacy_marginal_version0.txt");
+  //   fuse_core::TextOutputArchive archive(output_file);
+  //   expected.serialize(archive);
+  // }
+
+  // Deserialize a new constraint from that same stream
+  fuse_constraints::MarginalConstraint actual;
+  {
+    std::ifstream input_file("legacy_marginal_version0.txt");
+    fuse_core::TextInputArchive archive(input_file);
+    actual.deserialize(archive);
+  }
+
+  // Compare
+  EXPECT_EQ(expected.variables(), actual.variables());
+  EXPECT_EQ(expected.A(), actual.A());
+  EXPECT_EQ(expected.b(), actual.b());
+  EXPECT_EQ(expected.x_bar(), actual.x_bar());
+  // When deserializing the legacy file, the old local parameterizations
+  // should get wrapped in a ManifoldAdpater
+  using ExpectedManifold = fuse_core::ManifoldAdapter;
+  ASSERT_EQ(expected.manifolds().size(), actual.manifolds().size());
+  for (auto i = 0u; i < actual.manifolds().size(); ++i)
+  {
+    auto actual_derived = std::dynamic_pointer_cast<ExpectedManifold>(actual.manifolds()[i]);
+    EXPECT_TRUE(static_cast<bool>(actual_derived));
+  }
 }
+#endif

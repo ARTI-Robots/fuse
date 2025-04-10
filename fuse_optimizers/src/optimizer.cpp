@@ -31,79 +31,55 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_core/callback_wrapper.h>
-#include <fuse_core/graph.h>
-#include <fuse_core/transaction.h>
-#include <fuse_core/uuid.h>
-#include <fuse_optimizers/optimizer.h>
-#include <ros/callback_queue.h>
-#include <ros/init.h>
-#include <ros/node_handle.h>
-
-#include <XmlRpcValue.h>
 
 #include <functional>
 #include <numeric>
-#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include <fuse_core/callback_wrapper.hpp>
+#include <fuse_core/graph.hpp>
+#include <fuse_core/parameter.hpp>
+#include <fuse_core/transaction.hpp>
+#include <fuse_core/uuid.hpp>
+#include <fuse_graphs/hash_graph.hpp>
+#include <fuse_optimizers/optimizer.hpp>
+#include <rclcpp/time.hpp>
 
 namespace fuse_optimizers
 {
 
-/**
- * @brief Plugin name and type configuration, as received from the parameter server
- *
- * The entire configuration itself is also stored, so additional optional parameters can be retrieved, e.g. the
- * 'motion_models' parameter for the SensorModel plugins
- */
-struct PluginConfig
+Optimizer::Optimizer(fuse_core::node_interfaces::NodeInterfaces<ALL_FUSE_CORE_NODE_INTERFACES> interfaces,
+                     fuse_core::Graph::UniquePtr graph)
+  : interfaces_(interfaces)
+  , clock_(interfaces.get_node_clock_interface()->get_clock())
+  , logger_(interfaces.get_node_logging_interface()->get_logger())
+  , graph_(std::move(graph))
+  , motion_model_loader_("fuse_core", "fuse_core::MotionModel")
+  , publisher_loader_("fuse_core", "fuse_core::Publisher")
+  , sensor_model_loader_("fuse_core", "fuse_core::SensorModel")
+  , diagnostic_updater_(interfaces.get_node_base_interface(), interfaces.get_node_clock_interface(),
+                        interfaces.get_node_logging_interface(), interfaces.get_node_parameters_interface(),
+                        interfaces.get_node_timers_interface(), interfaces.get_node_topics_interface())
+  , callback_queue_(std::make_shared<fuse_core::CallbackAdapter>(interfaces_.get_node_base_interface()->get_context()))
 {
-  /**
-   * @brief Constructor. This allows to use emplace_back(name, type, config) instead of push_back({name, type, config}),
-   * that generates roslint whitespace/braces errors
-   *
-   * @param[in] name   The plugin name
-   * @param[in] type   The plugin type
-   * @param[in] config The entire configuration, that might have additiona optional parameters
-   */
-  PluginConfig(const std::string& name, const std::string& type, const XmlRpc::XmlRpcValue& config)
-    : name(name), type(type), config(config)
+  if (!graph)
   {
+    fuse_graphs::HashGraphParams hash_graph_params;
+    hash_graph_params.loadFromROS(interfaces_);
+    graph_ = fuse_graphs::HashGraph::make_unique(hash_graph_params);
   }
 
-  std::string name;            //!< Plugin name
-  std::string type;            //!< Plugin type
-  XmlRpc::XmlRpcValue config;  //!< The entire configuration, that might have additional optional parameters
-};
+  // add a ros1 style callback queue so that transactions can be processed in the optimiser's
+  // executor
+  interfaces_.get_node_waitables_interface()->add_waitable(callback_queue_, (rclcpp::CallbackGroup::SharedPtr) nullptr);
 
-Optimizer::Optimizer(
-  fuse_core::Graph::UniquePtr graph,
-  const ros::NodeHandle& node_handle,
-  const ros::NodeHandle& private_node_handle) :
-    graph_(std::move(graph)),
-    node_handle_(node_handle),
-    private_node_handle_(private_node_handle),
-    motion_model_loader_("fuse_core", "fuse_core::MotionModel"),
-    publisher_loader_("fuse_core", "fuse_core::Publisher"),
-    sensor_model_loader_("fuse_core", "fuse_core::SensorModel"),
-    diagnostic_updater_(node_handle_)
-{
-  // Setup diagnostics updater
-  private_node_handle_.param("diagnostic_updater_timer_period", diagnostic_updater_timer_period_,
-                             diagnostic_updater_timer_period_);
-
-  diagnostic_updater_timer_ =
-      private_node_handle_.createTimer(ros::Duration(diagnostic_updater_timer_period_),
-                                       boost::bind(&diagnostic_updater::Updater::update, &diagnostic_updater_));
-
-  diagnostic_updater_.add(private_node_handle_.getNamespace(), this, &Optimizer::setDiagnostics);
+  diagnostic_updater_.add(interfaces_.get_node_base_interface()->get_namespace(), this, &Optimizer::setDiagnostics);
   diagnostic_updater_.setHardwareID("fuse");
 
   // Wait for a valid time before loading any of the plugins
-  ros::Time::waitForValid();
+  clock_->wait_until_started();
 
   // Load all configured plugins
   loadMotionModels();
@@ -114,72 +90,74 @@ Optimizer::Optimizer(
   startPlugins();
 }
 
+// the classloader destructor makes clang-tidy complain...
+// TODO(henrygerardmoore): maybe look into this
+// NOLINTBEGIN(clang-analyzer-optin.cplusplus.VirtualCall)
 Optimizer::~Optimizer()
 {
   // Stop all the plugins
   stopPlugins();
 }
+// NOLINTEND(clang-analyzer-optin.cplusplus.VirtualCall)
 
 void Optimizer::loadMotionModels()
 {
-  // Read and configure all of sensor model plugins
-  if (!private_node_handle_.hasParam("motion_models"))
+  // struct for readability
+  typedef struct
   {
-    return;
-  }
-  // Validate the parameter server values
-  XmlRpc::XmlRpcValue motion_models;
-  private_node_handle_.getParam("motion_models", motion_models);
-  std::vector<PluginConfig> motion_model_configs;
-  if (motion_models.getType() == XmlRpc::XmlRpcValue::TypeArray)
-  {
-    // Validate all of the parameters before we attempt to create any plugin instances
-    for (int32_t motion_model_index = 0; motion_model_index < motion_models.size(); ++motion_model_index)
-    {
-      // Validate the parameter server values
-      const auto& motion_model = motion_models[motion_model_index];
-      if ( (motion_model.getType() != XmlRpc::XmlRpcValue::TypeStruct)
-        || (!motion_model.hasMember("name"))
-        || (!motion_model.hasMember("type")))
-      {
-        throw std::invalid_argument("The 'motion_models' parameter should be a list of the form: "
-                                    "-{name: string, type: string}");
-      }
+    std::string name;
+    std::string type;
+    std::string param_name;
+  } ModelConfig;
 
-      motion_model_configs.emplace_back(static_cast<std::string>(motion_model["name"]),
-                                        static_cast<std::string>(motion_model["type"]), motion_model);
+  // the configurations used to load models
+  std::vector<ModelConfig> motion_model_config;
+
+  std::unordered_set<std::string> const motion_model_names =
+      fuse_core::list_parameter_override_prefixes(interfaces_, "motion_models.");
+
+  // declare config parameters for each model
+  for (auto const& param_name : motion_model_names)
+  {
+    ModelConfig& config = motion_model_config.emplace_back();
+    config.name = param_name.substr(param_name.rfind('.') + 1);
+    config.param_name = param_name + ".type";
+
+    if (!interfaces_.get_node_parameters_interface()->has_parameter(config.param_name))
+    {
+      rcl_interfaces::msg::ParameterDescriptor descr;
+      descr.description = "the PLUGINLIB type string to load for this motion_model (eg: 'fuse_models::Unicycle2D')";
+      interfaces_.get_node_parameters_interface()->declare_parameter(config.param_name,
+                                                                     rclcpp::ParameterValue(std::string()), descr);
+    }
+
+    // get the type parameter for the motion model
+    rclcpp::Parameter const motion_model_type_param =
+        interfaces_.get_node_parameters_interface()->get_parameter(config.param_name);
+    // extract the type string from the parameter
+    if (motion_model_type_param.get_type() == rclcpp::ParameterType::PARAMETER_STRING)
+    {
+      config.type = motion_model_type_param.as_string();
+    }
+
+    // quickly check for common errors
+    if (config.type.empty())
+    {
+      RCLCPP_WARN_STREAM(logger_, "parameter '" << config.param_name << "' should be the string of a motion_model type "
+                                                << "for the motion_model named '" << config.name << "'.");
     }
   }
-  else if (motion_models.getType() == XmlRpc::XmlRpcValue::TypeStruct)
-  {
-    // Validate all of the parameters before we attempt to create any plugin instances
-    for (const auto& motion_model : motion_models)
-    {
-      const auto& motion_model_config = motion_model.second;
-      if ( (motion_model_config.getType() != XmlRpc::XmlRpcValue::TypeStruct)
-        || (!motion_model_config.hasMember("type")))
-      {
-        throw std::invalid_argument("The 'motion_models' parameter should be a struct of the form: "
-                                    "{string: {type: string}}");
-      }
 
-      motion_model_configs.emplace_back(static_cast<std::string>(motion_model.first),
-                                        static_cast<std::string>(motion_model_config["type"]), motion_model_config);
-    }
-  }
-  else
-  {
-    throw std::invalid_argument("The 'motion_models' parameter should be a list of the form: "
-                                "-{name: string, type: string} or a struct of the form: {string: {type: string}}");
-  }
+  // now load the models defined above
 
-  for (const auto& config : motion_model_configs)
+  for (ModelConfig const& config : motion_model_config)
   {
-    // Create a motion model object using pluginlib. This will throw if the plugin name is not found.
+    // Create a motion_model object using pluginlib. This will throw if the plugin name is not
+    // found.
     auto motion_model = motion_model_loader_.createUniqueInstance(config.type);
-    // Initialize the publisher
-    motion_model->initialize(config.name);
-    // Store the publisher in a member variable for use later
+    // Initialize the motion_model
+    motion_model->initialize(interfaces_, config.name);
+    // Store the motion_model in a member variable for use later
     motion_models_.emplace(config.name, std::move(motion_model));
   }
 
@@ -188,157 +166,183 @@ void Optimizer::loadMotionModels()
 
 void Optimizer::loadSensorModels()
 {
-  // Read and configure all of sensor model plugins
-  if (!private_node_handle_.hasParam("sensor_models"))
+  // struct for readability
+  typedef struct ModelConfig
   {
-    return;
-  }
-  // Validate the parameter server values
-  XmlRpc::XmlRpcValue sensor_models;
-  private_node_handle_.getParam("sensor_models", sensor_models);
-  std::vector<PluginConfig> sensor_model_configs;
-  if (sensor_models.getType() == XmlRpc::XmlRpcValue::TypeArray)
-  {
-    // Validate all of the parameters before we attempt to create any plugin instances
-    for (int32_t sensor_model_index = 0; sensor_model_index < sensor_models.size(); ++sensor_model_index)
-    {
-      // Validate the parameter server values
-      const auto& sensor_model = sensor_models[sensor_model_index];
-      if ( (sensor_model.getType() != XmlRpc::XmlRpcValue::TypeStruct)
-        || (!sensor_model.hasMember("name"))
-        || (!sensor_model.hasMember("type")))
-      {
-        throw std::invalid_argument("The 'sensor_models' parameter should be a list of the form: "
-                                    "-{name: string, type: string, motion_models: [name1, name2, ...]}");
-      }
+    std::string name;
+    std::string type;
+    bool ignition = false;
+    std::vector<std::string> associated_motion_models;
+    std::string type_param_name;
+    std::string models_param_name;
+    std::string ignition_param_name;
+  } ModelConfig;
 
-      sensor_model_configs.emplace_back(static_cast<std::string>(sensor_model["name"]),
-                                        static_cast<std::string>(sensor_model["type"]), sensor_model);
+  // the configurations used to load models
+  std::vector<ModelConfig> sensor_model_config;
+
+  std::unordered_set<std::string> const sensor_model_names =
+      fuse_core::list_parameter_override_prefixes(interfaces_, "sensor_models.");
+
+  // declare config parameters for each model
+  for (auto const& param_name : sensor_model_names)
+  {
+    ModelConfig& config = sensor_model_config.emplace_back();
+    config.name = param_name.substr(param_name.rfind('.') + 1);
+    config.type_param_name = param_name + ".type";
+    config.models_param_name = param_name + ".motion_models";
+    config.ignition_param_name = param_name + ".ignition";
+
+    // get the type parameter for the sensor model
+    if (!interfaces_.get_node_parameters_interface()->has_parameter(config.type_param_name))
+    {
+      rcl_interfaces::msg::ParameterDescriptor descr;
+      descr.description = "the PLUGINLIB type string to load for this sensor_model "
+                          "(eg: 'fuse_models::Acceleration2D')";
+      interfaces_.get_node_parameters_interface()->declare_parameter(config.type_param_name,
+                                                                     rclcpp::ParameterValue(std::string()), descr);
+    }
+
+    // get the type parameter for the sensor model
+    rclcpp::Parameter const sensor_model_type_param =
+        interfaces_.get_node_parameters_interface()->get_parameter(config.type_param_name);
+    // extract the type string from the parameter
+    if (sensor_model_type_param.get_type() == rclcpp::ParameterType::PARAMETER_STRING)
+    {
+      config.type = sensor_model_type_param.as_string();
+    }
+
+    // get the type parameter for the sensor model
+    if (!interfaces_.get_node_parameters_interface()->has_parameter(config.models_param_name))
+    {
+      rcl_interfaces::msg::ParameterDescriptor descr;
+      descr.description = "the list of motion models this sensor is associated with";
+      interfaces_.get_node_parameters_interface()->declare_parameter(
+          config.models_param_name, rclcpp::ParameterValue(std::vector<std::string>()), descr);
+    }
+
+    // get the model_list parameter for the sensor model
+    rclcpp::Parameter const sensor_model_model_list_param =
+        interfaces_.get_node_parameters_interface()->get_parameter(config.models_param_name);
+    // extract the model_list string from the parameter
+    if (sensor_model_model_list_param.get_type() == rclcpp::ParameterType::PARAMETER_STRING_ARRAY)
+    {
+      config.associated_motion_models = sensor_model_model_list_param.as_string_array();
+    }
+
+    // get the ignition parameter for the sensor model
+    if (!interfaces_.get_node_parameters_interface()->has_parameter(config.ignition_param_name))
+    {
+      rcl_interfaces::msg::ParameterDescriptor descr;
+      descr.description = "does the first message for this sensor start the optimizer";
+      interfaces_.get_node_parameters_interface()->declare_parameter(config.ignition_param_name,
+                                                                     rclcpp::ParameterValue(false), descr);
+    }
+
+    // get the model list parameter for the sensor model
+    rclcpp::Parameter const sensor_model_ignition_param =
+        interfaces_.get_node_parameters_interface()->get_parameter(config.ignition_param_name);
+    // extract the ignition bool from the parameter
+    if (sensor_model_ignition_param.get_type() == rclcpp::ParameterType::PARAMETER_BOOL)
+    {
+      config.ignition = sensor_model_ignition_param.as_bool();
+    }
+
+    // quickly check for common errors
+    if (config.type.empty())
+    {
+      RCLCPP_WARN_STREAM(logger_, "parameter '" << config.type_param_name
+                                                << "' should be the string of a sensor_model type "
+                                                << "for the sensor_model named '" << config.name << "'.");
     }
   }
-  else if (sensor_models.getType() == XmlRpc::XmlRpcValue::TypeStruct)
-  {
-    // Validate all of the parameters before we attempt to create any plugin instances
-    for (const auto& sensor_model : sensor_models)
-    {
-      // Validate the parameter server values
-      const auto& sensor_model_config = sensor_model.second;
-      if ( (sensor_model_config.getType() != XmlRpc::XmlRpcValue::TypeStruct)
-        || (!sensor_model_config.hasMember("type")))
-      {
-        throw std::invalid_argument("The 'sensor_models' parameter should be a struct of the form: "
-                                    "{string: {type: string, motion_models: [name1, name2, ...]}}");
-      }
 
-      sensor_model_configs.emplace_back(static_cast<std::string>(sensor_model.first),
-                                        static_cast<std::string>(sensor_model_config["type"]), sensor_model_config);
-    }
-  }
-  else
+  // now load the models defined above
+  for (ModelConfig const& config : sensor_model_config)
   {
-    throw std::invalid_argument("The 'sensor_models' parameter should be a list of the form: "
-                                "-{name: string, type: string, motion_models: [name1, name2, ...]} "
-                                "or a struct of the form: "
-                                "{string: {type: string, motion_models: [name1, name2, ...]}}");
-  }
-
-  for (const auto& config : sensor_model_configs)
-  {
-    // Check whether this is an ignition sensor model or not
-    const bool ignition = config.config.hasMember("ignition") ? static_cast<bool>(config.config["ignition"]) : false;
-
     // Create a sensor object using pluginlib. This will throw if the plugin name is not found.
     auto sensor_model = sensor_model_loader_.createUniqueInstance(config.type);
     // Initialize the sensor
-    sensor_model->initialize(
-      config.name,
-      std::bind(&Optimizer::injectCallback, this, config.name, std::placeholders::_1));
+    sensor_model->initialize(interfaces_, config.name,
+                             std::bind(&Optimizer::injectCallback, this, config.name, std::placeholders::_1));
     // Store the sensor in a member variable for use later
     sensor_models_.emplace(config.name,
-                           SensorModelInfo{ std::move(sensor_model), ignition });  // NOLINT(whitespace/braces)
+                           SensorModelInfo{ std::move(sensor_model), config.ignition });  // NOLINT(whitespace/braces)
 
     // Parse out the list of associated motion models, if any
-    if ( (config.config.hasMember("motion_models"))
-      && (config.config["motion_models"].getType() == XmlRpc::XmlRpcValue::TypeArray))
+    associated_motion_models_[config.name] = config.associated_motion_models;
+
+    for (auto const& motion_model_name : config.associated_motion_models)
     {
-      XmlRpc::XmlRpcValue motion_model_list = config.config["motion_models"];
-      for (int32_t motion_model_index = 0; motion_model_index < motion_model_list.size(); ++motion_model_index)
+      if (motion_models_.find(motion_model_name) == motion_models_.end())
       {
-        const auto motion_model_name = static_cast<std::string>(motion_model_list[motion_model_index]);
-        associated_motion_models_[config.name].push_back(motion_model_name);
-        if (motion_models_.find(motion_model_name) == motion_models_.end())
-        {
-          ROS_WARN_STREAM("Sensor model '" << config.name << "' is configured to use motion model '" <<
-                          motion_model_name << "', but no motion model with that name currently exists. This is " <<
-                          "likely a configuration error.");
-        }
+        RCLCPP_WARN_STREAM(logger_, "Sensor model '" << config.name << "' is configured to use motion model '"
+                                                     << motion_model_name
+                                                     << "', but no motion model with that name currently exists. "
+                                                     << "This is likely a configuration error.");
       }
     }
   }
-
   diagnostic_updater_.force_update();
 }
 
 void Optimizer::loadPublishers()
 {
-  // Read and configure all of the publisher plugins
-  if (!private_node_handle_.hasParam("publishers"))
+  // struct for readability
+  typedef struct
   {
-    return;
-  }
-  // Validate the parameter server values
-  XmlRpc::XmlRpcValue publishers;
-  private_node_handle_.getParam("publishers", publishers);
-  std::vector<PluginConfig> publisher_configs;
-  if (publishers.getType() == XmlRpc::XmlRpcValue::TypeArray)
-  {
-    // Validate all of the parameters before we attempt to create any plugin instances
-    for (int32_t publisher_index = 0; publisher_index < publishers.size(); ++publisher_index)
-    {
-      // Validate the parameter server values
-      const auto& publisher = publishers[publisher_index];
-      if ( (publisher.getType() != XmlRpc::XmlRpcValue::TypeStruct)
-        || (!publisher.hasMember("name"))
-        || (!publisher.hasMember("type")))
-      {
-        throw std::invalid_argument("The 'publishers' parameter should be a list of the form: "
-                                    "-{name: string, type: string}");
-      }
+    std::string name;
+    std::string type;
+    std::string param_name;
+  } PublisherConfig;
 
-      publisher_configs.emplace_back(static_cast<std::string>(publisher["name"]),
-                                     static_cast<std::string>(publisher["type"]), publisher);
+  // the configurations used to load models
+  std::vector<PublisherConfig> publisher_config;
+
+  std::unordered_set<std::string> const publisher_names =
+      fuse_core::list_parameter_override_prefixes(interfaces_, "publishers.");
+
+  // declare config parameters for each model
+  for (auto const& param_name : publisher_names)
+  {
+    PublisherConfig& config = publisher_config.emplace_back();
+    config.name = param_name.substr(param_name.rfind('.') + 1);
+    config.param_name = param_name + ".type";
+
+    if (!interfaces_.get_node_parameters_interface()->has_parameter(config.param_name))
+    {
+      rcl_interfaces::msg::ParameterDescriptor descr;
+      descr.description = "the PLUGINLIB type string to load for this publisher "
+                          "(eg: 'fuse_publishers::Path2DPublisher')";
+      interfaces_.get_node_parameters_interface()->declare_parameter(config.param_name,
+                                                                     rclcpp::ParameterValue(std::string()), descr);
+    }
+
+    // get the type parameter for the publisher
+    rclcpp::Parameter const publisher_type_param =
+        interfaces_.get_node_parameters_interface()->get_parameter(config.param_name);
+    // extract the type string from the parameter
+    if (publisher_type_param.get_type() == rclcpp::ParameterType::PARAMETER_STRING)
+    {
+      config.type = publisher_type_param.as_string();
+    }
+
+    // quickly check for common errors
+    if (config.type.empty())
+    {
+      RCLCPP_WARN_STREAM(logger_, "parameter '" << config.param_name << "' should be the string of a publisher type "
+                                                << "for the publisher named '" << config.name << "'.");
     }
   }
-  else if (publishers.getType() == XmlRpc::XmlRpcValue::TypeStruct)
-  {
-    // Validate all of the parameters before we attempt to create any plugin instances
-    for (const auto& publisher : publishers)
-    {
-      // Validate the parameter server values
-      const auto& publisher_config = publisher.second;
-      if ( (publisher_config.getType() != XmlRpc::XmlRpcValue::TypeStruct)
-        || (!publisher_config.hasMember("type")))
-      {
-        throw std::invalid_argument("The 'publishers' parameter should be a struct of the form: "
-                                    "{string: {type: string}}");
-      }
 
-      publisher_configs.emplace_back(static_cast<std::string>(publisher.first),
-                                     static_cast<std::string>(publisher_config["type"]), publisher_config);
-    }
-  }
-  else
-  {
-    throw std::invalid_argument("The 'publishers' parameter should be a list of the form: "
-                                "-{name: string, type: string} or a struct of the form: {string: {type: string}}");
-  }
+  // now load the models defined above
 
-  for (const auto& config : publisher_configs)
+  for (PublisherConfig const& config : publisher_config)
   {
-    // Create a Publisher object using pluginlib. This will throw if the plugin name is not found.
+    // Create a publisher object using pluginlib. This will throw if the plugin name is not found.
     auto publisher = publisher_loader_.createUniqueInstance(config.type);
     // Initialize the publisher
-    publisher->initialize(config.name);
+    publisher->initialize(interfaces_, config.name);
     // Store the publisher in a member variable for use later
     publishers_.emplace(config.name, std::move(publisher));
   }
@@ -346,9 +350,7 @@ void Optimizer::loadPublishers()
   diagnostic_updater_.force_update();
 }
 
-bool Optimizer::applyMotionModels(
-  const std::string& sensor_name,
-  fuse_core::Transaction& transaction) const
+bool Optimizer::applyMotionModels(std::string const& sensor_name, fuse_core::Transaction& transaction) const
 {
   // Check for trivial cases where we don't have to do anything
   auto iter = associated_motion_models_.find(sensor_name);
@@ -357,98 +359,96 @@ bool Optimizer::applyMotionModels(
     return true;
   }
   // Generate constraints for each configured motion model
-  const auto& motion_model_names = iter->second;
+  auto const& motion_model_names = iter->second;
   bool success = true;
-  for (const auto& motion_model_name : motion_model_names)
+  for (auto const& motion_model_name : motion_model_names)
   {
     try
     {
       success &= motion_models_.at(motion_model_name)->apply(transaction);
     }
-    catch (const std::exception& e)
+    catch (std::exception const& e)
     {
-      ROS_ERROR_STREAM("Error generating constraints for sensor '" << sensor_name << "' "
-                       << "from motion model '" << motion_model_name << "'. Error: " << e.what());
+      RCLCPP_ERROR_STREAM(logger_, "Error generating constraints for sensor '" << sensor_name << "' from motion model '"
+                                                                               << motion_model_name
+                                                                               << "'. Error: " << e.what());
       success = false;
     }
   }
   return success;
 }
 
-void Optimizer::notify(
-  fuse_core::Transaction::ConstSharedPtr transaction,
-  fuse_core::Graph::ConstSharedPtr graph)
+void Optimizer::notify(fuse_core::Transaction::ConstSharedPtr const& transaction,
+                       fuse_core::Graph::ConstSharedPtr const& graph)
 {
-  for (const auto& name__sensor_model : sensor_models_)
+  for (auto const& name_sensor_model : sensor_models_)
   {
     try
     {
-      name__sensor_model.second.model->graphCallback(graph);
+      name_sensor_model.second.model->graphCallback(graph);
     }
-    catch (const std::exception& e)
+    catch (std::exception const& e)
     {
-      ROS_ERROR_STREAM("Failed calling graphCallback() on sensor '" << name__sensor_model.first << "'. " <<
-                       "Error: " << e.what());
+      RCLCPP_ERROR_STREAM(logger_, "Failed calling graphCallback() on sensor '" << name_sensor_model.first
+                                                                                << "'. Error: " << e.what());
       continue;
     }
   }
-  for (const auto& name__motion_model : motion_models_)
+  for (auto const& name_motion_model : motion_models_)
   {
     try
     {
-      name__motion_model.second->graphCallback(graph);
+      name_motion_model.second->graphCallback(graph);
     }
-    catch (const std::exception& e)
+    catch (std::exception const& e)
     {
-      ROS_ERROR_STREAM("Failed calling graphCallback() on motion model '" << name__motion_model.first << "." <<
-                       " Error: " << e.what());
+      RCLCPP_ERROR_STREAM(logger_, "Failed calling graphCallback() on motion model '" << name_motion_model.first
+                                                                                      << ". Error: " << e.what());
       continue;
     }
   }
-  for (const auto& name__publisher : publishers_)
+  for (auto const& name_publisher : publishers_)
   {
     try
     {
-      name__publisher.second->notify(transaction, graph);
+      name_publisher.second->notify(transaction, graph);
     }
-    catch (const std::exception& e)
+    catch (std::exception const& e)
     {
-      ROS_ERROR_STREAM("Failed calling notify() on publisher '" << name__publisher.first << "." <<
-                       " Error: " << e.what());
+      RCLCPP_ERROR_STREAM(logger_,
+                          "Failed calling notify() on publisher '" << name_publisher.first << ". Error: " << e.what());
       continue;
     }
   }
 }
 
-void Optimizer::injectCallback(
-  const std::string& sensor_name,
-  fuse_core::Transaction::SharedPtr transaction)
+void Optimizer::injectCallback(std::string const& sensor_name, fuse_core::Transaction::SharedPtr transaction)
 {
-  // We are going to insert a call to the derived class's transactionCallback() method into the global callback queue.
-  // This returns execution to the sensor's thread quickly by moving the transaction processing to the optimizer's
-  // thread. And by using the existing ROS callback queue, we simplify the threading model of the optimizer.
-  ros::getGlobalCallbackQueue()->addCallback(
-    boost::make_shared<fuse_core::CallbackWrapper<void>>(
-      std::bind(&Optimizer::transactionCallback, this, sensor_name, std::move(transaction))),
-    reinterpret_cast<uint64_t>(this));
+  // We are going to insert a call to the derived class's transactionCallback() method into the
+  // global callback queue. This returns execution to the sensor's thread quickly by moving the
+  // transaction processing to the optimizer's thread. And by using the existing ROS callback queue,
+  // we simplify the threading model of the optimizer.
+  auto callback = std::make_shared<fuse_core::CallbackWrapper<void>>(
+      std::bind(&Optimizer::transactionCallback, this, sensor_name, std::move(transaction)));
+  callback_queue_->addCallback(callback);
 }
 
 void Optimizer::clearCallbacks()
 {
-  ros::getGlobalCallbackQueue()->removeByID(reinterpret_cast<uint64_t>(this));
+  callback_queue_->removeAllCallbacks();
 }
 
 void Optimizer::startPlugins()
 {
-  for (const auto& name_plugin : motion_models_)
+  for (auto const& name_plugin : motion_models_)
   {
     name_plugin.second->start();
   }
-  for (const auto& name_plugin : sensor_models_)
+  for (auto const& name_plugin : sensor_models_)
   {
     name_plugin.second.model->start();
   }
-  for (const auto& name_plugin : publishers_)
+  for (auto const& name_plugin : publishers_)
   {
     name_plugin.second->start();
   }
@@ -458,15 +458,15 @@ void Optimizer::startPlugins()
 
 void Optimizer::stopPlugins()
 {
-  for (const auto& name_plugin : publishers_)
+  for (auto const& name_plugin : publishers_)
   {
     name_plugin.second->stop();
   }
-  for (const auto& name_plugin : sensor_models_)
+  for (auto const& name_plugin : sensor_models_)
   {
     name_plugin.second.model->stop();
   }
-  for (const auto& name_plugin : motion_models_)
+  for (auto const& name_plugin : motion_models_)
   {
     name_plugin.second->stop();
   }
@@ -476,15 +476,17 @@ void Optimizer::stopPlugins()
 
 void Optimizer::setDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& status)
 {
-  if (!ros::Time::isValid())
+  if (!clock_->started())
   {
-    status.summary(diagnostic_msgs::DiagnosticStatus::WARN, "Waiting for valid ROS time");
+    status.summary(diagnostic_msgs::msg::DiagnosticStatus::WARN, "Waiting for valid ROS time");
     return;
   }
 
-  status.summary(diagnostic_msgs::DiagnosticStatus::OK, "Optimization converged");
+  // TODO(BrettRD): test for previous convergence success or failure
 
-  auto print_key = [](const std::string& result, const auto& entry) { return result + entry.first + ' '; };
+  status.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "Optimizer exists");
+
+  auto print_key = [](std::string const& result, auto const& entry) { return result + entry.first + ' '; };
 
   status.add("Sensor Models", std::accumulate(sensor_models_.begin(), sensor_models_.end(), std::string(), print_key));
   status.add("Motion Models", std::accumulate(motion_models_.begin(), motion_models_.end(), std::string(), print_key));

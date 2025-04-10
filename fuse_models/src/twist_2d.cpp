@@ -31,16 +31,13 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_models/common/sensor_proc.h>
-#include <fuse_models/twist_2d.h>
-
-#include <fuse_core/transaction.h>
-#include <fuse_core/uuid.h>
-
-#include <geometry_msgs/TwistWithCovarianceStamped.h>
-#include <pluginlib/class_list_macros.h>
-#include <ros/ros.h>
-
+#include <fuse_core/transaction.hpp>
+#include <fuse_core/uuid.hpp>
+#include <fuse_models/common/sensor_proc.hpp>
+#include <fuse_models/twist_2d.hpp>
+#include <geometry_msgs/msg/twist_with_covariance_stamped.hpp>
+#include <pluginlib/class_list_macros.hpp>
+#include <rclcpp/rclcpp.hpp>
 
 // Register this sensor model with ROS as a plugin.
 PLUGINLIB_EXPORT_CLASS(fuse_models::Twist2D, fuse_core::SensorModel)
@@ -48,67 +45,77 @@ PLUGINLIB_EXPORT_CLASS(fuse_models::Twist2D, fuse_core::SensorModel)
 namespace fuse_models
 {
 
-Twist2D::Twist2D() :
-  fuse_core::AsyncSensorModel(1),
-  device_id_(fuse_core::uuid::NIL),
-  tf_listener_(tf_buffer_),
-  throttled_callback_(std::bind(&Twist2D::process, this, std::placeholders::_1))
+Twist2D::Twist2D()
+  : fuse_core::AsyncSensorModel(1)
+  , device_id_(fuse_core::uuid::NIL)
+  , logger_(rclcpp::get_logger("uninitialized"))
+  , throttled_callback_(std::bind(&Twist2D::process, this, std::placeholders::_1))
 {
+}
+
+void Twist2D::initialize(fuse_core::node_interfaces::NodeInterfaces<ALL_FUSE_CORE_NODE_INTERFACES> interfaces,
+                         std::string const& name, fuse_core::TransactionCallback transaction_callback)
+{
+  interfaces_ = interfaces;
+  fuse_core::AsyncSensorModel::initialize(interfaces, name, transaction_callback);
 }
 
 void Twist2D::onInit()
 {
-  // Read settings from the parameter sever
-  device_id_ = fuse_variables::loadDeviceId(private_node_handle_);
+  logger_ = interfaces_.get_node_logging_interface()->get_logger();
+  clock_ = interfaces_.get_node_clock_interface()->get_clock();
 
-  params_.loadFromROS(private_node_handle_);
+  // Read settings from the parameter sever
+  device_id_ = fuse_variables::loadDeviceId(interfaces_);
+
+  params_.loadFromROS(interfaces_, name_);
 
   throttled_callback_.setThrottlePeriod(params_.throttle_period);
-  throttled_callback_.setUseWallTime(params_.throttle_use_wall_time);
 
-  if (params_.linear_indices.empty() &&
-      params_.angular_indices.empty())
+  if (!params_.throttle_use_wall_time)
   {
-    ROS_WARN_STREAM("No dimensions were specified. Data from topic " << ros::names::resolve(params_.topic) <<
-                    " will be ignored.");
+    throttled_callback_.setClock(clock_);
   }
+
+  if (params_.linear_indices.empty() && params_.angular_indices.empty())
+  {
+    RCLCPP_WARN_STREAM(logger_,
+                       "No dimensions were specified. Data from topic " << params_.topic << " will be ignored.");
+  }
+
+  tf_buffer_ = std::make_unique<tf2_ros::Buffer>(clock_);
+  tf_listener_ = std::make_unique<tf2_ros::TransformListener>(*tf_buffer_, &interfaces_);
 }
 
 void Twist2D::onStart()
 {
-  if (!params_.linear_indices.empty() ||
-      !params_.angular_indices.empty())
+  if (!params_.linear_indices.empty() || !params_.angular_indices.empty())
   {
-    subscriber_ = node_handle_.subscribe<geometry_msgs::TwistWithCovarianceStamped>(
-        ros::names::resolve(params_.topic), params_.queue_size, &TwistThrottledCallback::callback, &throttled_callback_,
-        ros::TransportHints().tcpNoDelay(params_.tcp_no_delay));
+    rclcpp::SubscriptionOptions sub_options;
+    sub_options.callback_group = cb_group_;
+
+    sub_ = rclcpp::create_subscription<geometry_msgs::msg::TwistWithCovarianceStamped>(
+        interfaces_, params_.topic, params_.queue_size,
+        std::bind(&TwistThrottledCallback::callback<geometry_msgs::msg::TwistWithCovarianceStamped const&>,
+                  &throttled_callback_, std::placeholders::_1),
+        sub_options);
   }
 }
 
 void Twist2D::onStop()
 {
-  subscriber_.shutdown();
+  sub_.reset();
 }
 
-void Twist2D::process(const geometry_msgs::TwistWithCovarianceStamped::ConstPtr& msg)
+void Twist2D::process(geometry_msgs::msg::TwistWithCovarianceStamped const& msg)
 {
   // Create a transaction object
   auto transaction = fuse_core::Transaction::make_shared();
-  transaction->stamp(msg->header.stamp);
+  transaction->stamp(msg.header.stamp);
 
-  common::processTwistWithCovariance(
-    name(),
-    device_id_,
-    *msg,
-    params_.linear_loss,
-    params_.angular_loss,
-    params_.target_frame,
-    params_.linear_indices,
-    params_.angular_indices,
-    tf_buffer_,
-    !params_.disable_checks,
-    *transaction,
-    params_.tf_timeout);
+  common::processTwistWithCovariance(name(), device_id_, msg, params_.linear_loss, params_.angular_loss,
+                                     params_.target_frame, params_.linear_indices, params_.angular_indices, *tf_buffer_,
+                                     !params_.disable_checks, *transaction, params_.tf_timeout);
 
   // Send the transaction object to the plugin's parent
   sendTransaction(transaction);

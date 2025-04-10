@@ -31,25 +31,21 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_variables/position_3d_stamped.h>
-
-#include <fuse_core/uuid.h>
-#include <fuse_variables/fixed_size_variable.h>
-#include <fuse_variables/stamped.h>
-#include <pluginlib/class_list_macros.h>
-#include <ros/time.h>
-
-#include <boost/serialization/export.hpp>
-
 #include <ostream>
 
+#include <boost/serialization/export.hpp>
+#include <fuse_core/uuid.hpp>
+#include <fuse_variables/fixed_size_variable.hpp>
+#include <fuse_variables/position_3d_stamped.hpp>
+#include <fuse_variables/stamped.hpp>
+#include <pluginlib/class_list_macros.hpp>
+#include <rclcpp/time.hpp>
 
 namespace fuse_variables
 {
 
-Position3DStamped::Position3DStamped(const ros::Time& stamp, const fuse_core::UUID& device_id) :
-  FixedSizeVariable(fuse_core::uuid::generate(detail::type(), stamp, device_id)),
-  Stamped(stamp, device_id)
+Position3DStamped::Position3DStamped(rclcpp::Time const& stamp, fuse_core::UUID const& device_id)
+  : FixedSizeVariable(fuse_core::uuid::generate(detail::type(), stamp, device_id)), Stamped(stamp, device_id)
 {
 }
 
@@ -58,7 +54,7 @@ void Position3DStamped::print(std::ostream& stream) const
   stream << type() << ":\n"
          << "  uuid: " << uuid() << "\n"
          << "  device_id: " << deviceId() << "\n"
-         << "  stamp: " << stamp() << "\n"
+         << "  stamp: " << stamp().nanoseconds() << "\n"
          << "  size: " << size() << "\n"
          << "  data:\n"
          << "  - x: " << x() << "\n"

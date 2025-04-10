@@ -31,30 +31,29 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_loss/welsch_loss.h>
-#include <fuse_loss/loss_function.h>
-
-#include <pluginlib/class_list_macros.h>
-#include <ros/node_handle.h>
-
-#include <boost/serialization/export.hpp>
-
 #include <ostream>
 #include <string>
 
+#include <boost/serialization/export.hpp>
+#include <fuse_core/parameter.hpp>
+#include <fuse_loss/loss_function.hpp>
+#include <fuse_loss/welsch_loss.hpp>
+#include <pluginlib/class_list_macros.hpp>
 
 namespace fuse_loss
 {
 
-WelschLoss::WelschLoss(const double a) : a_(a)
+WelschLoss::WelschLoss(double const a) : a_(a)
 {
 }
 
-void WelschLoss::initialize(const std::string& name)
+void WelschLoss::initialize(
+    fuse_core::node_interfaces::NodeInterfaces<fuse_core::node_interfaces::Base, fuse_core::node_interfaces::Logging,
+                                               fuse_core::node_interfaces::Parameters>
+        interfaces,
+    std::string const& name)
 {
-  ros::NodeHandle private_node_handle(name);
-
-  private_node_handle.param("a", a_, a_);
+  a_ = fuse_core::getParam(interfaces, name + ".a", a_);
 }
 
 void WelschLoss::print(std::ostream& stream) const

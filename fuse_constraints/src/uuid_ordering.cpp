@@ -31,15 +31,13 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_constraints/uuid_ordering.h>
-
-#include <fuse_core/uuid.h>
-
+#include <fuse_constraints/uuid_ordering.hpp>
+#include <fuse_core/uuid.hpp>
 
 namespace fuse_constraints
 {
-UuidOrdering::UuidOrdering(std::initializer_list<fuse_core::UUID> uuid_list) :
-  UuidOrdering(uuid_list.begin(), uuid_list.end())
+UuidOrdering::UuidOrdering(std::initializer_list<fuse_core::UUID> uuid_list)
+  : UuidOrdering(uuid_list.begin(), uuid_list.end())
 {
 }
 
@@ -53,39 +51,39 @@ size_t UuidOrdering::size() const
   return order_.size();
 }
 
-bool UuidOrdering::exists(const unsigned int index) const
+bool UuidOrdering::exists(unsigned int const index) const
 {
-  return (index < order_.size());
+  return index < order_.size();
 }
 
-bool UuidOrdering::exists(const fuse_core::UUID& uuid) const
+bool UuidOrdering::exists(fuse_core::UUID const& uuid) const
 {
-  return (order_.right.find(uuid) != order_.right.end());
+  return order_.right.find(uuid) != order_.right.end();
 }
 
-bool UuidOrdering::push_back(const fuse_core::UUID& uuid)
+bool UuidOrdering::push_back(fuse_core::UUID const& uuid)
 {
   auto result = order_.insert(order_.end(), UuidOrderMapping::value_type(order_.size(), uuid));
   return result.second;
 }
 
-const fuse_core::UUID& UuidOrdering::operator[](const unsigned int index) const
+fuse_core::UUID const& UuidOrdering::operator[](unsigned int const index) const
 {
   return order_.left[index].second;
 }
 
-unsigned int UuidOrdering::operator[](const fuse_core::UUID& uuid)
+unsigned int UuidOrdering::operator[](fuse_core::UUID const& uuid)
 {
   auto result = order_.insert(order_.end(), UuidOrderMapping::value_type(order_.size(), uuid));
   return (*result.first).get_left();
 }
 
-const fuse_core::UUID& UuidOrdering::at(const unsigned int index) const
+fuse_core::UUID const& UuidOrdering::at(unsigned int const index) const
 {
   return order_.left.at(index).second;
 }
 
-unsigned int UuidOrdering::at(const fuse_core::UUID& uuid) const
+unsigned int UuidOrdering::at(fuse_core::UUID const& uuid) const
 {
   return order_.right.at(uuid);
 }

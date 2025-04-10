@@ -31,11 +31,6 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_core/serialization.h>
-#include <fuse_variables/point_3d_fixed_landmark.h>
-#include <fuse_variables/stamped.h>
-#include <ros/time.h>
-
 #include <ceres/autodiff_cost_function.h>
 #include <ceres/problem.h>
 #include <ceres/solver.h>
@@ -44,12 +39,16 @@
 #include <sstream>
 #include <vector>
 
-using fuse_variables::Point3DFixedLandmark;
+#include <fuse_core/serialization.hpp>
+#include <fuse_variables/point_3d_fixed_landmark.hpp>
+#include <fuse_variables/stamped.hpp>
+#include <rclcpp/time.hpp>
 
+using fuse_variables::Point3DFixedLandmark;
 
 TEST(Point3DFixedLandmark, Type)
 {
-  Point3DFixedLandmark variable(0);
+  Point3DFixedLandmark const variable(0);
   EXPECT_EQ("fuse_variables::Point3DFixedLandmark", variable.type());
 }
 
@@ -57,24 +56,25 @@ TEST(Point3DFixedLandmark, UUID)
 {
   // Verify two positions with the same landmark ids produce the same uuids
   {
-    Point3DFixedLandmark variable1(0);
-    Point3DFixedLandmark variable2(0);
+    Point3DFixedLandmark const variable1(0);
+    Point3DFixedLandmark const variable2(0);
     EXPECT_EQ(variable1.uuid(), variable2.uuid());
   }
 
-    // Verify two positions with the different landmark ids  produce different uuids
+  // Verify two positions with the different landmark ids  produce different uuids
   {
-    Point3DFixedLandmark variable1(0);
-    Point3DFixedLandmark variable2(1);
+    Point3DFixedLandmark const variable1(0);
+    Point3DFixedLandmark const variable2(1);
     EXPECT_NE(variable1.uuid(), variable2.uuid());
   }
 }
 
 struct CostFunctor
 {
-  CostFunctor() {}
+  CostFunctor() = default;
 
-  template <typename T> bool operator()(const T* const x, T* residual) const
+  template <typename T>
+  bool operator()(const T* const x, T* residual) const
   {
     residual[0] = x[0] - T(3.0);
     residual[1] = x[1] + T(8.0);
@@ -96,22 +96,17 @@ TEST(Point3DFixedLandmark, Optimization)
 
   // Build the problem.
   ceres::Problem problem;
-  problem.AddParameterBlock(
-    position.data(),
-    position.size());
+  problem.AddParameterBlock(position.data(), static_cast<int>(position.size()));
   std::vector<double*> parameter_blocks;
   parameter_blocks.push_back(position.data());
-  problem.AddResidualBlock(
-    cost_function,
-    nullptr,
-    parameter_blocks);
+  problem.AddResidualBlock(cost_function, nullptr, parameter_blocks);
   if (position.holdConstant())
   {
     problem.SetParameterBlockConstant(position.data());
   }
 
   // Run the solver
-  ceres::Solver::Options options;
+  ceres::Solver::Options const options;
   ceres::Solver::Summary summary;
   ceres::Solve(options, &problem, &summary);
 
@@ -149,10 +144,4 @@ TEST(Point3DFixedLandmark, Serialization)
   EXPECT_EQ(expected.x(), actual.x());
   EXPECT_EQ(expected.y(), actual.y());
   EXPECT_EQ(expected.z(), actual.z());
-}
-
-int main(int argc, char **argv)
-{
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

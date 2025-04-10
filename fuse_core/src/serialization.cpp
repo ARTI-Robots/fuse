@@ -31,18 +31,15 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_core/serialization.h>
-
 #include <algorithm>
 #include <vector>
 
+#include <fuse_core/serialization.hpp>
 
 namespace fuse_core
 {
 
-MessageBufferStreamSource::MessageBufferStreamSource(const std::vector<unsigned char>& data) :
-  data_(data),
-  index_(0)
+MessageBufferStreamSource::MessageBufferStreamSource(std::vector<unsigned char> const& data) : data_(data), index_(0)
 {
 }
 
@@ -61,12 +58,11 @@ std::streamsize MessageBufferStreamSource::read(char_type* s, std::streamsize n)
   }
 }
 
-MessageBufferStreamSink::MessageBufferStreamSink(std::vector<unsigned char>& data) :
-  data_(data)
+MessageBufferStreamSink::MessageBufferStreamSink(std::vector<unsigned char>& data) : data_(data)
 {
 }
 
-std::streamsize MessageBufferStreamSink::write(const char_type* s, std::streamsize n)
+std::streamsize MessageBufferStreamSink::write(char_type const* s, std::streamsize n)
 {
   data_.insert(data_.end(), s, s + n);
   return n;

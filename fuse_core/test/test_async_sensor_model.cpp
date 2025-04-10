@@ -31,11 +31,10 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_core/async_sensor_model.h>
-#include <ros/ros.h>
-
 #include <gtest/gtest.h>
 
+#include <fuse_core/async_sensor_model.hpp>
+#include <rclcpp/rclcpp.hpp>
 
 /**
  * @brief Flag used to track the execution of the transaction callback
@@ -47,7 +46,7 @@ static bool received_transaction = false;
  */
 void transactionCallback(fuse_core::Transaction::SharedPtr /*transaction*/)
 {
-  ros::Duration(1.0).sleep();
+  rclcpp::sleep_for(std::chrono::milliseconds(1000));
   received_transaction = true;
 }
 
@@ -57,9 +56,7 @@ void transactionCallback(fuse_core::Transaction::SharedPtr /*transaction*/)
 class MySensor : public fuse_core::AsyncSensorModel
 {
 public:
-  MySensor() :
-    fuse_core::AsyncSensorModel(1),
-    initialized(false)
+  MySensor() : fuse_core::AsyncSensorModel(1), initialized(false)
   {
   }
 
@@ -72,61 +69,85 @@ public:
 
   void onGraphUpdate(fuse_core::Graph::ConstSharedPtr /*graph*/) override
   {
-    ros::Duration(1.0).sleep();
+    rclcpp::sleep_for(std::chrono::milliseconds(10));
     graph_received = true;
   }
 
-  bool graph_received;
-  bool initialized;
+  bool graph_received = false;
+  bool initialized = false;
 };
 
-TEST(AsyncSensorModel, OnInit)
+class TestAsyncSensorModel : public ::testing::Test
 {
-  MySensor sensor;
-  sensor.initialize("my_sensor", &transactionCallback);
-  EXPECT_TRUE(sensor.initialized);
+public:
+  void SetUp()
+  {
+    rclcpp::init(0, nullptr);
+  }
+
+  void TearDown()
+  {
+    rclcpp::shutdown();
+  }
+};
+
+TEST_F(TestAsyncSensorModel, OnInit)
+{
+  for (int i = 0; i < 50; i++)
+  {
+    MySensor sensor;
+    auto node = rclcpp::Node::make_shared("test_async_sensor_model_node");
+    sensor.initialize(*node, "my_sensor_" + std::to_string(i), &transactionCallback);
+    EXPECT_TRUE(sensor.initialized);
+  }
 }
 
-TEST(AsyncSensorModel, OnGraphUpdate)
+TEST_F(TestAsyncSensorModel, DoubleInit)
+{
+  MySensor sensor_model;
+  auto node = rclcpp::Node::make_shared("test_async_sensor_model_node");
+  sensor_model.initialize(*node, "my_sensor_model", &transactionCallback);
+  EXPECT_TRUE(sensor_model.initialized);
+  EXPECT_THROW(sensor_model.initialize(*node, "test", &transactionCallback), std::runtime_error);
+}
+
+TEST_F(TestAsyncSensorModel, OnGraphUpdate)
 {
   MySensor sensor;
-  sensor.initialize("my_sensor", &transactionCallback);
+  auto node = rclcpp::Node::make_shared("test_async_sensor_model_node");
+  sensor.initialize(*node, "my_sensor", &transactionCallback);
 
   // Execute the graph callback in this thread. This should push a call to MySensor::onGraphUpdate()
   // into MySensor's callback queue, which will get executed by MySensor's async spinner.
-  // There is a time delay there. So, this call should return almost immediately, then we have to wait
-  // a bit before the "received_graph" flag gets flipped.
-  fuse_core::Graph::ConstSharedPtr graph;  // nullptr...which is fine because we do not actually use it
-  sensor.graphCallback(graph);
-  EXPECT_FALSE(sensor.graph_received);
-  ros::Time wait_time_elapsed = ros::Time::now() + ros::Duration(10.0);
-  while (!sensor.graph_received && ros::Time::now() < wait_time_elapsed)
+  // There is a time delay there. So, this call should return almost immediately, then we have to
+  // wait a bit before the "received_graph" flag gets flipped.
+  fuse_core::Graph::ConstSharedPtr graph;  // nullptr is ok as we don't actually use it
+  auto clock = rclcpp::Clock(RCL_SYSTEM_TIME);
+
+  // Test for multiple cycles of graphCallback to be sure
+  for (int i = 0; i < 50; i++)
   {
-    ros::Duration(0.1).sleep();
+    sensor.graph_received = false;
+    sensor.graphCallback(graph);
+    EXPECT_FALSE(sensor.graph_received);
+    rclcpp::Time wait_time_elapsed = clock.now() + rclcpp::Duration::from_seconds(10);
+    while (!sensor.graph_received && clock.now() < wait_time_elapsed)
+    {
+      rclcpp::sleep_for(std::chrono::milliseconds(10));
+    }
+    EXPECT_TRUE(sensor.graph_received);
   }
-  EXPECT_TRUE(sensor.graph_received);
 }
 
-TEST(AsyncSensorModel, SendTransaction)
+TEST_F(TestAsyncSensorModel, SendTransaction)
 {
   MySensor sensor;
-  sensor.initialize("my_sensor", &transactionCallback);
+  auto node = rclcpp::Node::make_shared("test_async_sensor_model_node");
+  sensor.initialize(*node, "my_sensor", &transactionCallback);
 
-  // Use the sensor "sendTransaction()" method to execute the transaction callback. This will get executed immediately.
-  fuse_core::Transaction::SharedPtr transaction;  // nullptr, okay because we don't actually use it for anything
+  // Use the sensor "sendTransaction()" method to execute the transaction callback. This will get
+  // executed immediately.
+  fuse_core::Transaction::SharedPtr transaction;  // nullptr is ok as we don't actually use it
   sensor.sendTransaction(transaction);
   EXPECT_TRUE(received_transaction);
-}
-
-int main(int argc, char** argv)
-{
-  testing::InitGoogleTest(&argc, argv);
-  ros::init(argc, argv, "test_async_sensor_model");
-
-  ros::AsyncSpinner spinner(1);
-  spinner.start();
-  int ret = RUN_ALL_TESTS();
-  spinner.stop();
-  ros::shutdown();
-  return ret;
 }

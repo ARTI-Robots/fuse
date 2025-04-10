@@ -31,19 +31,17 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_constraints/normal_delta_pose_2d.h>
-#include <fuse_constraints/normal_delta_pose_2d_cost_functor.h>
-
-#include <test/cost_function_gtest.h>
-
-#include <gtest/gtest.h>
-#include <fuse_core/eigen_gtest.h>
-
 #include <ceres/autodiff_cost_function.h>
 #include <Eigen/Dense>
+#include <gtest/gtest.h>
 
 #include <array>
 #include <string>
+
+#include "cost_function_gtest.hpp"
+#include <fuse_constraints/normal_delta_pose_2d.hpp>
+#include <fuse_constraints/normal_delta_pose_2d_cost_functor.hpp>
+#include <fuse_core/eigen_gtest.hpp>
 
 /**
  * @brief Test fixture that initializes a full pose 2d delta and sqrt information matrix.
@@ -64,10 +62,12 @@ public:
   }
 
   const fuse_core::Matrix3d covariance =
-      fuse_core::Vector3d(2e-3, 1e-3, 1e-2).asDiagonal();  //!< The full pose 2d covariance for the x, y and yaw
-                                                           //!< components
-  Eigen::Matrix3d full_sqrt_information;  //!< The full pose 2d sqrt information matrix for the x, y and yaw components
-  const Eigen::Vector3d full_delta{ 1.0, 2.0, 3.0 };  //!< The full pose 2d delta components: x, y and yaw
+      fuse_core::Vector3d(2e-3, 1e-3, 1e-2).asDiagonal();  //!< The full pose 2d covariance for the x,
+                                                           //!< y and yaw components
+  Eigen::Matrix3d full_sqrt_information;                   //!< The full pose 2d sqrt information matrix for the x, y
+                                                           //!< and yaw components
+  const Eigen::Vector3d full_delta{ 1.0, 2.0, 3.0 };       //!< The full pose 2d delta components: x, y and
+                                                           //!< yaw
 };
 
 TEST_F(NormalDeltaPose2DTestFixture, AnalyticAndAutoDiffCostFunctionsAreEqualForFullResiduals)
@@ -76,7 +76,7 @@ TEST_F(NormalDeltaPose2DTestFixture, AnalyticAndAutoDiffCostFunctionsAreEqualFor
   const fuse_constraints::NormalDeltaPose2D cost_function{ full_sqrt_information, full_delta };
 
   // Create automatic differentiation cost function
-  const auto num_residuals = full_sqrt_information.rows();
+  auto const num_residuals = full_sqrt_information.rows();
 
   AutoDiffNormalDeltaPose2D autodiff_cost_function(
       new fuse_constraints::NormalDeltaPose2DCostFunctor(full_sqrt_information, full_delta), num_residuals);
@@ -87,10 +87,11 @@ TEST_F(NormalDeltaPose2DTestFixture, AnalyticAndAutoDiffCostFunctionsAreEqualFor
 
 TEST_F(NormalDeltaPose2DTestFixture, AnalyticAndAutoDiffCostFunctionsAreEqualForTwoResiduals)
 {
-  // Create cost function for each possible pair of two residuals, the ones in each possible pair of rows
+  // Create cost function for each possible pair of two residuals, the ones in each possible pair of
+  // rows
   using IndicesPair = std::array<int, 2>;
   std::array<IndicesPair, 3> indices_pairs = { IndicesPair{ 0, 1 }, IndicesPair{ 0, 2 }, IndicesPair{ 1, 2 } };
-  for (const auto& indices_pair : indices_pairs)
+  for (auto const& indices_pair : indices_pairs)
   {
     // It is a shame we need Eigen 3.4+ in order to use the slicing and indexing API documented in:
     //
@@ -109,7 +110,7 @@ TEST_F(NormalDeltaPose2DTestFixture, AnalyticAndAutoDiffCostFunctionsAreEqualFor
     const fuse_constraints::NormalDeltaPose2D cost_function{ partial_sqrt_information, full_delta };
 
     // Create automatic differentiation cost function
-    const auto num_residuals = partial_sqrt_information.rows();
+    auto const num_residuals = partial_sqrt_information.rows();
 
     AutoDiffNormalDeltaPose2D autodiff_cost_function(
         new fuse_constraints::NormalDeltaPose2DCostFunctor(partial_sqrt_information, full_delta), num_residuals);
@@ -130,17 +131,11 @@ TEST_F(NormalDeltaPose2DTestFixture, AnalyticAndAutoDiffCostFunctionsAreEqualFor
     const fuse_constraints::NormalDeltaPose2D cost_function{ partial_sqrt_information, full_delta };
 
     // Create automatic differentiation cost function
-    const auto num_residuals = partial_sqrt_information.rows();
+    auto const num_residuals = partial_sqrt_information.rows();
 
     AutoDiffNormalDeltaPose2D autodiff_cost_function(
         new fuse_constraints::NormalDeltaPose2DCostFunctor(partial_sqrt_information, full_delta), num_residuals);
 
     ExpectCostFunctionsAreEqual(autodiff_cost_function, cost_function);
   }
-}
-
-int main(int argc, char **argv)
-{
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

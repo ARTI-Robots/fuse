@@ -31,19 +31,14 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_core/uuid.h>
-
-#include <ros/time.h>
-
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_io.hpp>
-
 #include <algorithm>
 #include <array>
 #include <mutex>
-#include <random>
-#include <string>
 
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_io.hpp>
+#include <fuse_core/uuid.hpp>
+#include <rclcpp/time.hpp>
 
 namespace fuse_core
 {
@@ -65,40 +60,46 @@ UUID generate()
   return uuid;
 }
 
-UUID generate(const std::string& namespace_string, const ros::Time& stamp)
+UUID generate(std::string const& namespace_string, rclcpp::Time const& stamp)
 {
-  constexpr size_t buffer_size = sizeof(stamp.sec) + sizeof(stamp.nsec);
+  auto const nanoseconds = stamp.nanoseconds();
+  constexpr size_t buffer_size = sizeof(nanoseconds);
   std::array<unsigned char, buffer_size> buffer;
-  auto iter = buffer.begin();
-  iter = std::copy(reinterpret_cast<const unsigned char*>(&stamp.sec),
-                   reinterpret_cast<const unsigned char*>(&stamp.sec) + sizeof(stamp.sec),
-                   iter);
-  iter = std::copy(reinterpret_cast<const unsigned char*>(&stamp.nsec),
-                   reinterpret_cast<const unsigned char*>(&stamp.nsec) + sizeof(stamp.nsec),
-                   iter);
+
+  // Explicitly pack nanosecond bits from LSB -> MSB by masking and shifting
+  // E.g. 10 would be 0x00000000'0000000A, so the buffer would store 0x0A at buffer[0]
+  for (size_t i = 0; i < sizeof(nanoseconds); i++)
+  {
+    auto mask = (nanoseconds & (static_cast<int64_t>(0xFF) << 8 * i));
+    buffer[i] = static_cast<unsigned char>(mask >> 8 * i);
+  }
+
   return generate(namespace_string, buffer.data(), buffer.size());
 }
 
-UUID generate(const std::string& namespace_string, const ros::Time& stamp, const UUID& id)
+UUID generate(std::string const& namespace_string, rclcpp::Time const& stamp, const UUID& id)
 {
-  constexpr size_t buffer_size = sizeof(stamp.sec) + sizeof(stamp.nsec) + UUID::static_size();
+  auto const nanoseconds = stamp.nanoseconds();
+  constexpr size_t buffer_size = sizeof(nanoseconds) + UUID::static_size();
   std::array<unsigned char, buffer_size> buffer;
-  auto iter = buffer.begin();
-  iter = std::copy(reinterpret_cast<const unsigned char*>(&stamp.sec),
-                   reinterpret_cast<const unsigned char*>(&stamp.sec) + sizeof(stamp.sec),
-                   iter);
-  iter = std::copy(reinterpret_cast<const unsigned char*>(&stamp.nsec),
-                   reinterpret_cast<const unsigned char*>(&stamp.nsec) + sizeof(stamp.nsec),
-                   iter);
-  iter = std::copy(id.begin(),
-                   id.end(),
-                   iter);
+
+  // Explicitly pack nanosecond bits from LSB -> MSB by masking and shifting
+  for (size_t i = 0; i < sizeof(nanoseconds); i++)
+  {
+    auto mask = (nanoseconds & (static_cast<int64_t>(0xFF) << 8 * i));
+    buffer[i] = static_cast<unsigned char>(mask >> 8 * i);
+  }
+
+  // Then append the ID bytes
+  auto iter = &buffer[sizeof(nanoseconds)];
+  iter = std::copy(id.begin(), id.end(), iter);
+
   return generate(namespace_string, buffer.data(), buffer.size());
 }
 
-UUID generate(const std::string& namespace_string, const uint64_t& user_id)
+UUID generate(std::string const& namespace_string, uint64_t const& user_id)
 {
-  return generate(namespace_string, reinterpret_cast<const unsigned char*>(&user_id), sizeof(user_id));
+  return generate(namespace_string, reinterpret_cast<unsigned char const*>(&user_id), sizeof(user_id));
 }
 
 }  // namespace uuid

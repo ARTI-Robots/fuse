@@ -31,50 +31,43 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_constraints/relative_orientation_3d_stamped_constraint.h>
-
-#include <fuse_constraints/normal_delta_orientation_3d_cost_functor.h>
-#include <pluginlib/class_list_macros.h>
-
-#include <boost/serialization/export.hpp>
 #include <ceres/autodiff_cost_function.h>
 #include <Eigen/Geometry>
 
 #include <string>
 
+#include <boost/serialization/export.hpp>
+#include <fuse_constraints/normal_delta_orientation_3d_cost_functor.hpp>
+#include <fuse_constraints/relative_orientation_3d_stamped_constraint.hpp>
+#include <pluginlib/class_list_macros.hpp>
 
 namespace fuse_constraints
 {
 
 RelativeOrientation3DStampedConstraint::RelativeOrientation3DStampedConstraint(
-  const std::string& source,
-  const fuse_variables::Orientation3DStamped& orientation1,
-  const fuse_variables::Orientation3DStamped& orientation2,
-  const fuse_core::Vector4d& delta,
-  const fuse_core::Matrix3d& covariance) :
-    fuse_core::Constraint(source, {orientation1.uuid(), orientation2.uuid()}),  // NOLINT(whitespace/braces)
-    delta_(delta),
-    sqrt_information_(covariance.inverse().llt().matrixU())
+    std::string const& source, fuse_variables::Orientation3DStamped const& orientation1,
+    fuse_variables::Orientation3DStamped const& orientation2, fuse_core::Vector4d const& delta,
+    fuse_core::Matrix3d const& covariance)
+  : fuse_core::Constraint(source, { orientation1.uuid(), orientation2.uuid() })
+  ,  // NOLINT
+  delta_(delta)
+  , sqrt_information_(covariance.inverse().llt().matrixU())
 {
 }
 
 RelativeOrientation3DStampedConstraint::RelativeOrientation3DStampedConstraint(
-  const std::string& source,
-  const fuse_variables::Orientation3DStamped& orientation1,
-  const fuse_variables::Orientation3DStamped& orientation2,
-  const Eigen::Quaterniond& delta,
-  const fuse_core::Matrix3d& covariance) :
-    RelativeOrientation3DStampedConstraint(source, orientation1, orientation2, toEigen(delta), covariance)
+    std::string const& source, fuse_variables::Orientation3DStamped const& orientation1,
+    fuse_variables::Orientation3DStamped const& orientation2, Eigen::Quaterniond const& delta,
+    fuse_core::Matrix3d const& covariance)
+  : RelativeOrientation3DStampedConstraint(source, orientation1, orientation2, toEigen(delta), covariance)
 {
 }
 
 RelativeOrientation3DStampedConstraint::RelativeOrientation3DStampedConstraint(
-  const std::string& source,
-  const fuse_variables::Orientation3DStamped& orientation1,
-  const fuse_variables::Orientation3DStamped& orientation2,
-  const geometry_msgs::Quaternion& delta,
-  const std::array<double, 9>& covariance) :
-    RelativeOrientation3DStampedConstraint(source, orientation1, orientation2, toEigen(delta), toEigen(covariance))
+    std::string const& source, fuse_variables::Orientation3DStamped const& orientation1,
+    fuse_variables::Orientation3DStamped const& orientation2, geometry_msgs::msg::Quaternion const& delta,
+    std::array<double, 9> const& covariance)
+  : RelativeOrientation3DStampedConstraint(source, orientation1, orientation2, toEigen(delta), toEigen(covariance))
 {
 }
 
@@ -103,24 +96,24 @@ void RelativeOrientation3DStampedConstraint::print(std::ostream& stream) const
 ceres::CostFunction* RelativeOrientation3DStampedConstraint::costFunction() const
 {
   return new ceres::AutoDiffCostFunction<NormalDeltaOrientation3DCostFunctor, 3, 4, 4>(
-    new NormalDeltaOrientation3DCostFunctor(sqrt_information_, delta_));
+      new NormalDeltaOrientation3DCostFunctor(sqrt_information_, delta_));
 }
 
-fuse_core::Vector4d RelativeOrientation3DStampedConstraint::toEigen(const Eigen::Quaterniond& quaternion)
+fuse_core::Vector4d RelativeOrientation3DStampedConstraint::toEigen(Eigen::Quaterniond const& quaternion)
 {
   fuse_core::Vector4d eigen_quaternion_vector;
   eigen_quaternion_vector << quaternion.w(), quaternion.x(), quaternion.y(), quaternion.z();
   return eigen_quaternion_vector;
 }
 
-fuse_core::Vector4d RelativeOrientation3DStampedConstraint::toEigen(const geometry_msgs::Quaternion& quaternion)
+fuse_core::Vector4d RelativeOrientation3DStampedConstraint::toEigen(geometry_msgs::msg::Quaternion const& quaternion)
 {
   fuse_core::Vector4d eigen_quaternion_vector;
   eigen_quaternion_vector << quaternion.w, quaternion.x, quaternion.y, quaternion.z;
   return eigen_quaternion_vector;
 }
 
-fuse_core::Matrix3d RelativeOrientation3DStampedConstraint::toEigen(const std::array<double, 9>& covariance)
+fuse_core::Matrix3d RelativeOrientation3DStampedConstraint::toEigen(std::array<double, 9> const& covariance)
 {
   return fuse_core::Matrix3d(covariance.data());
 }

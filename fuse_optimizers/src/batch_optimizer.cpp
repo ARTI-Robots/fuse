@@ -31,38 +31,34 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_core/transaction.h>
-#include <fuse_optimizers/batch_optimizer.h>
-#include <fuse_optimizers/optimizer.h>
-#include <ros/ros.h>
 
-#include <algorithm>
 #include <mutex>
 #include <string>
-#include <utility>
 #include <thread>
+#include <utility>
 
+#include <fuse_core/transaction.hpp>
+#include <fuse_optimizers/batch_optimizer.hpp>
+#include <fuse_optimizers/optimizer.hpp>
+#include <rclcpp/rclcpp.hpp>
 
 namespace fuse_optimizers
 {
 
-BatchOptimizer::BatchOptimizer(
-  fuse_core::Graph::UniquePtr graph,
-  const ros::NodeHandle& node_handle,
-  const ros::NodeHandle& private_node_handle) :
-    fuse_optimizers::Optimizer(std::move(graph), node_handle, private_node_handle),
-    combined_transaction_(fuse_core::Transaction::make_shared()),
-    optimization_request_(false),
-    start_time_(ros::TIME_MAX),
-    started_(false)
+BatchOptimizer::BatchOptimizer(fuse_core::node_interfaces::NodeInterfaces<ALL_FUSE_CORE_NODE_INTERFACES> interfaces,
+                               fuse_core::Graph::UniquePtr graph)
+  : fuse_optimizers::Optimizer(interfaces, std::move(graph))
+  , combined_transaction_(fuse_core::Transaction::make_shared())
+  , optimization_request_(false)
+  , start_time_(rclcpp::Time::max())
+  , started_(false)
 {
-  params_.loadFromROS(private_node_handle);
+  params_.loadFromROS(interfaces_);
 
   // Configure a timer to trigger optimizations
-  optimize_timer_ = node_handle_.createTimer(
-    ros::Duration(params_.optimization_period),
-    &BatchOptimizer::optimizerTimerCallback,
-    this);
+  optimize_timer_ = rclcpp::create_timer(interfaces_, clock_, params_.optimization_period,
+                                         std::bind(&BatchOptimizer::optimizerTimerCallback, this),
+                                         interfaces_.get_node_base_interface()->get_default_callback_group());
 
   // Start the optimization thread
   optimization_thread_ = std::thread(&BatchOptimizer::optimizationLoop, this);
@@ -82,14 +78,17 @@ BatchOptimizer::~BatchOptimizer()
 void BatchOptimizer::applyMotionModelsToQueue()
 {
   // We need get the pending transactions from the queue
-  std::lock_guard<std::mutex> pending_transactions_lock(pending_transactions_mutex_);
+  std::lock_guard<std::mutex> const pending_transactions_lock(pending_transactions_mutex_);
+  rclcpp::Time current_time;
   // Use the most recent transaction time as the current time
-  ros::Time current_time(0, 0);
   if (!pending_transactions_.empty())
   {
+    // Use the most recent transaction time as the current time
     current_time = pending_transactions_.rbegin()->first;
   }
-  // Attempt to process each pending transaction
+
+  // TODO(CH3): We might have to check for time validity here? Attempt to process each pending
+  //            transaction
   while (!pending_transactions_.empty())
   {
     auto& element = pending_transactions_.begin()->second;
@@ -99,22 +98,23 @@ void BatchOptimizer::applyMotionModelsToQueue()
       if (element.transaction->stamp() + params_.transaction_timeout < current_time)
       {
         // Warn that this transaction has expired, then skip it.
-        ROS_ERROR_STREAM("The queued transaction with timestamp " << element.transaction->stamp()
-                          << " could not be processed after " << (current_time - element.transaction->stamp())
-                          << " seconds, which is greater than the 'transaction_timeout' value of "
-                          << params_.transaction_timeout << ". Ignoring this transaction.");
+        RCLCPP_ERROR_STREAM(logger_,
+                            "The queued transaction with timestamp "
+                                << element.transaction->stamp().nanoseconds() << " could not be processed after "
+                                << (current_time - element.transaction->stamp()).nanoseconds()
+                                << " seconds, which is greater than the 'transaction_timeout' value of "
+                                << params_.transaction_timeout.nanoseconds() << ". Ignoring this transaction.");
         pending_transactions_.erase(pending_transactions_.begin());
         continue;
       }
-      else
-      {
-        // Stop processing future transactions. Try again next time.
-        break;
-      }
+
+      // Stop processing future transactions. Try again next time.
+      break;
     }
-    // Merge the sensor+motion model transactions into a combined transaction that will be applied directly to the graph
+    // Merge the sensor+motion model transactions into a combined transaction that will be applied
+    // directly to the graph
     {
-      std::lock_guard<std::mutex> combined_transaction_lock(combined_transaction_mutex_);
+      std::lock_guard<std::mutex> const combined_transaction_lock(combined_transaction_mutex_);
       combined_transaction_->merge(*element.transaction, true);
     }
     // We are done with this transaction. Delete it from the queue.
@@ -125,22 +125,26 @@ void BatchOptimizer::applyMotionModelsToQueue()
 void BatchOptimizer::optimizationLoop()
 {
   // Optimize constraints until told to exit
-  while (ros::ok())
+  while (interfaces_.get_node_base_interface()->get_context()->is_valid())
   {
     // Wait for the next signal to start the next optimization cycle
     {
       std::unique_lock<std::mutex> lock(optimization_requested_mutex_);
-      optimization_requested_.wait(lock, [this]{ return optimization_request_ || !ros::ok(); });  // NOLINT
+      optimization_requested_.wait(lock, [this] {
+        /* *INDENT-OFF* */
+        return (optimization_request_ || !interfaces_.get_node_base_interface()->get_context()->is_valid());
+        /* *INDENT-ON* */
+      });
     }
     // If a shutdown is requested, exit now.
-    if (!ros::ok())
+    if (!interfaces_.get_node_base_interface()->get_context()->is_valid())
     {
       break;
     }
     // Copy the combined transaction so it can be shared with all the plugins
     fuse_core::Transaction::ConstSharedPtr const_transaction;
     {
-      std::lock_guard<std::mutex> lock(combined_transaction_mutex_);
+      std::lock_guard<std::mutex> const lock(combined_transaction_mutex_);
       const_transaction = std::move(combined_transaction_);
       combined_transaction_ = fuse_core::Transaction::make_shared();
     }
@@ -149,7 +153,7 @@ void BatchOptimizer::optimizationLoop()
     // Optimize the entire graph
     graph_->optimize(params_.solver_options);
     // Make a copy of the graph to share
-    fuse_core::Graph::ConstSharedPtr const_graph = graph_->clone();
+    fuse_core::Graph::ConstSharedPtr const const_graph = graph_->clone();
     // Optimization is complete. Notify all the things about the graph changes.
     notify(const_transaction, const_graph);
     // Clear the request flag now that this optimization cycle is complete
@@ -157,7 +161,7 @@ void BatchOptimizer::optimizationLoop()
   }
 }
 
-void BatchOptimizer::optimizerTimerCallback(const ros::TimerEvent& /*event*/)
+void BatchOptimizer::optimizerTimerCallback()
 {
   // If an "ignition" transaction hasn't been received, then we can't do anything yet.
   if (!started_)
@@ -168,7 +172,7 @@ void BatchOptimizer::optimizerTimerCallback(const ros::TimerEvent& /*event*/)
   applyMotionModelsToQueue();
   // Check if there is any pending information to be applied to the graph.
   {
-    std::lock_guard<std::mutex> lock(combined_transaction_mutex_);
+    std::lock_guard<std::mutex> const lock(combined_transaction_mutex_);
     optimization_request_ = !combined_transaction_->empty();
   }
   // If there is some pending work, trigger the next optimization cycle.
@@ -180,18 +184,18 @@ void BatchOptimizer::optimizerTimerCallback(const ros::TimerEvent& /*event*/)
   }
 }
 
-void BatchOptimizer::transactionCallback(
-  const std::string& sensor_name,
-  fuse_core::Transaction::SharedPtr transaction)
+void BatchOptimizer::transactionCallback(std::string const& sensor_name, fuse_core::Transaction::SharedPtr transaction)
 {
   // Add the new transaction to the pending set
   // Either we haven't "started" yet and we want to keep a short history of transactions around
   // Or we have "started" already, and the new transaction is after the starting time.
-  ros::Time transaction_time = transaction->stamp();
-  ros::Time last_pending_time(0, 0);
+  auto transaction_clock_type = transaction->stamp().get_clock_type();
+
+  rclcpp::Time const transaction_time = transaction->stamp();
+  rclcpp::Time last_pending_time(0, 0, transaction_clock_type);  // NOTE(CH3): Uninitialized
   if (!started_ || transaction_time >= start_time_)
   {
-    std::lock_guard<std::mutex> lock(pending_transactions_mutex_);
+    std::lock_guard<std::mutex> const lock(pending_transactions_mutex_);
     pending_transactions_.emplace(transaction_time, TransactionQueueElement(sensor_name, std::move(transaction)));
     last_pending_time = pending_transactions_.rbegin()->first;
   }
@@ -205,16 +209,17 @@ void BatchOptimizer::transactionCallback(
       start_time_ = transaction_time;
     }
     // Purge old transactions from the pending queue
-    ros::Time purge_time(0, 0);
+    rclcpp::Time purge_time(0, 0, transaction_clock_type);  // NOTE(CH3): Uninitialized
     if (started_)
     {
       purge_time = start_time_;
     }
-    else if (ros::Time(0, 0) + params_.transaction_timeout < last_pending_time)  // prevent a bad subtraction
+    else if (  // prevent a bad subtraction  // NOLINT
+        rclcpp::Time(params_.transaction_timeout.nanoseconds(), last_pending_time.get_clock_type()) < last_pending_time)
     {
       purge_time = last_pending_time - params_.transaction_timeout;
     }
-    std::lock_guard<std::mutex> lock(pending_transactions_mutex_);
+    std::lock_guard<std::mutex> const lock(pending_transactions_mutex_);
     auto purge_iter = pending_transactions_.lower_bound(purge_time);
     pending_transactions_.erase(pending_transactions_.begin(), purge_iter);
   }
@@ -227,13 +232,13 @@ void BatchOptimizer::transactionCallback(
 
 void BatchOptimizer::setDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& status)
 {
-  status.summary(diagnostic_msgs::DiagnosticStatus::OK, "BatchOptimizer");
+  status.summary(diagnostic_msgs::msg::DiagnosticStatus::OK, "BatchOptimizer");
 
   Optimizer::setDiagnostics(status);
 
   status.add("Started", started_);
   {
-    std::lock_guard<std::mutex> lock(pending_transactions_mutex_);
+    std::lock_guard<std::mutex> const lock(pending_transactions_mutex_);
     status.add("Pending Transactions", pending_transactions_.size());
   }
 }

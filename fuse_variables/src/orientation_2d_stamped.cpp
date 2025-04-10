@@ -31,26 +31,24 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_variables/orientation_2d_stamped.h>
-
-#include <fuse_core/local_parameterization.h>
-#include <fuse_core/uuid.h>
-#include <fuse_variables/fixed_size_variable.h>
-#include <fuse_variables/stamped.h>
-#include <pluginlib/class_list_macros.h>
-#include <ros/time.h>
-
-#include <boost/serialization/export.hpp>
-
+#include <memory>
 #include <ostream>
 
+#include <boost/serialization/export.hpp>
+#include <fuse_core/local_parameterization.hpp>
+#include <fuse_core/manifold.hpp>
+#include <fuse_core/uuid.hpp>
+#include <fuse_variables/fixed_size_variable.hpp>
+#include <fuse_variables/orientation_2d_stamped.hpp>
+#include <fuse_variables/stamped.hpp>
+#include <pluginlib/class_list_macros.hpp>
+#include <rclcpp/time.hpp>
 
 namespace fuse_variables
 {
 
-Orientation2DStamped::Orientation2DStamped(const ros::Time& stamp, const fuse_core::UUID& device_id) :
-  FixedSizeVariable(fuse_core::uuid::generate(detail::type(), stamp, device_id)),
-  Stamped(stamp, device_id)
+Orientation2DStamped::Orientation2DStamped(rclcpp::Time const& stamp, fuse_core::UUID const& device_id)
+  : FixedSizeVariable(fuse_core::uuid::generate(detail::type(), stamp, device_id)), Stamped(stamp, device_id)
 {
 }
 
@@ -58,7 +56,7 @@ void Orientation2DStamped::print(std::ostream& stream) const
 {
   stream << type() << ":\n"
          << "  uuid: " << uuid() << "\n"
-         << "  stamp: " << stamp() << "\n"
+         << "  stamp: " << stamp().nanoseconds() << "\n"
          << "  device_id: " << deviceId() << "\n"
          << "  size: " << size() << "\n"
          << "  data:\n"
@@ -70,8 +68,18 @@ fuse_core::LocalParameterization* Orientation2DStamped::localParameterization() 
   return new Orientation2DLocalParameterization();
 }
 
+#if CERES_SUPPORTS_MANIFOLDS
+[[nodiscard]] fuse_core::Manifold* Orientation2DStamped::manifold() const
+{
+  return new Orientation2DManifold();
+}
+#endif
+
 }  // namespace fuse_variables
 
+#if CERES_SUPPORTS_MANIFOLDS
+BOOST_CLASS_EXPORT_IMPLEMENT(fuse_variables::Orientation2DManifold);
+#endif
 BOOST_CLASS_EXPORT_IMPLEMENT(fuse_variables::Orientation2DLocalParameterization);
 BOOST_CLASS_EXPORT_IMPLEMENT(fuse_variables::Orientation2DStamped);
 PLUGINLIB_EXPORT_CLASS(fuse_variables::Orientation2DStamped, fuse_core::Variable);

@@ -31,33 +31,27 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_constraints/relative_pose_3d_stamped_constraint.h>
-
-#include <fuse_constraints/normal_delta_pose_3d_cost_functor.h>
-#include <pluginlib/class_list_macros.h>
-
-#include <boost/serialization/export.hpp>
 #include <ceres/autodiff_cost_function.h>
 
 #include <string>
 
+#include <boost/serialization/export.hpp>
+#include <fuse_constraints/normal_delta_pose_3d_cost_functor.hpp>
+#include <fuse_constraints/relative_pose_3d_stamped_constraint.hpp>
+#include <pluginlib/class_list_macros.hpp>
 
 namespace fuse_constraints
 {
 
 RelativePose3DStampedConstraint::RelativePose3DStampedConstraint(
-  const std::string& source,
-  const fuse_variables::Position3DStamped& position1,
-  const fuse_variables::Orientation3DStamped& orientation1,
-  const fuse_variables::Position3DStamped& position2,
-  const fuse_variables::Orientation3DStamped& orientation2,
-  const fuse_core::Vector7d& delta,
-  const fuse_core::Matrix6d& covariance) :
-    fuse_core::Constraint(
-      source,
-      {position1.uuid(), orientation1.uuid(), position2.uuid(), orientation2.uuid()}),  // NOLINT(whitespace/braces)
-    delta_(delta),
-    sqrt_information_(covariance.inverse().llt().matrixU())
+    std::string const& source, fuse_variables::Position3DStamped const& position1,
+    fuse_variables::Orientation3DStamped const& orientation1, fuse_variables::Position3DStamped const& position2,
+    fuse_variables::Orientation3DStamped const& orientation2, fuse_core::Vector7d const& delta,
+    fuse_core::Matrix6d const& covariance)
+  : fuse_core::Constraint(source, { position1.uuid(), orientation1.uuid(), position2.uuid(), orientation2.uuid() })
+  ,  // NOLINT
+  delta_(delta)
+  , sqrt_information_(covariance.inverse().llt().matrixU())
 {
 }
 
@@ -76,8 +70,9 @@ void RelativePose3DStampedConstraint::print(std::ostream& stream) const
 
 ceres::CostFunction* RelativePose3DStampedConstraint::costFunction() const
 {
+  // TODO(giafranchini): implement cost function with analytical derivatives
   return new ceres::AutoDiffCostFunction<NormalDeltaPose3DCostFunctor, 6, 3, 4, 3, 4>(
-    new NormalDeltaPose3DCostFunctor(sqrt_information_, delta_));
+      new NormalDeltaPose3DCostFunctor(sqrt_information_, delta_));
 }
 
 }  // namespace fuse_constraints

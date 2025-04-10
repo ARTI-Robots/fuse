@@ -31,34 +31,27 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_constraints/relative_pose_2d_stamped_constraint.h>
-
-#include <fuse_constraints/normal_delta_pose_2d.h>
-#include <pluginlib/class_list_macros.h>
-
-#include <boost/serialization/export.hpp>
 #include <ceres/autodiff_cost_function.h>
 
 #include <string>
 #include <vector>
 
+#include <boost/serialization/export.hpp>
+#include <fuse_constraints/normal_delta_pose_2d.hpp>
+#include <fuse_constraints/relative_pose_2d_stamped_constraint.hpp>
+#include <pluginlib/class_list_macros.hpp>
 
 namespace fuse_constraints
 {
 
 RelativePose2DStampedConstraint::RelativePose2DStampedConstraint(
-  const std::string& source,
-  const fuse_variables::Position2DStamped& position1,
-  const fuse_variables::Orientation2DStamped& orientation1,
-  const fuse_variables::Position2DStamped& position2,
-  const fuse_variables::Orientation2DStamped& orientation2,
-  const fuse_core::VectorXd& partial_delta,
-  const fuse_core::MatrixXd& partial_covariance,
-  const std::vector<size_t>& linear_indices,
-  const std::vector<size_t>& angular_indices) :
-    fuse_core::Constraint(
-      source,
-      {position1.uuid(), orientation1.uuid(), position2.uuid(), orientation2.uuid()})  // NOLINT(whitespace/braces)
+    std::string const& source, fuse_variables::Position2DStamped const& position1,
+    fuse_variables::Orientation2DStamped const& orientation1, fuse_variables::Position2DStamped const& position2,
+    fuse_variables::Orientation2DStamped const& orientation2, fuse_core::VectorXd const& partial_delta,
+    fuse_core::MatrixXd const& partial_covariance, std::vector<size_t> const& linear_indices,
+    std::vector<size_t> const& angular_indices)
+  : fuse_core::Constraint(source,
+                          { position1.uuid(), orientation1.uuid(), position2.uuid(), orientation2.uuid() })  // NOLINT
 {
   size_t total_variable_size = position1.size() + orientation1.size();
   size_t total_indices = linear_indices.size() + angular_indices.size();
@@ -70,13 +63,15 @@ RelativePose2DStampedConstraint::RelativePose2DStampedConstraint(
   // Compute the sqrt information of the provided cov matrix
   fuse_core::MatrixXd partial_sqrt_information = partial_covariance.inverse().llt().matrixU();
 
-  // Assemble a mean vector and sqrt information matrix from the provided values, but in proper variable order
+  // Assemble a mean vector and sqrt information matrix from the provided values, but in proper
+  // variable order
+  //
   // What are we doing here?
   // The constraint equation is defined as: cost(x) = ||A * (x - b)||^2
-  // If we are measuring a subset of dimensions, we only want to produce costs for the measured dimensions.
-  // But the variable vectors will be full sized. We can make this all work out by creating a non-square A
-  // matrix, where each row computes a cost for one measured dimensions, and the columns are in the order
-  // defined by the variable.
+  // If we are measuring a subset of dimensions, we only want to produce costs for the measured
+  // dimensions. But the variable vectors will be full sized. We can make this all work out by
+  // creating a non-square A matrix, where each row computes a cost for one measured dimensions,
+  // and the columns are in the order defined by the variable.
   delta_ = fuse_core::Vector3d::Zero();
   sqrt_information_ = fuse_core::MatrixXd::Zero(total_indices, total_variable_size);
 

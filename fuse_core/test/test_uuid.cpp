@@ -31,9 +31,6 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_core/uuid.h>
-#include <ros/time.h>
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -41,14 +38,15 @@
 #include <unordered_set>
 #include <vector>
 
+#include <fuse_core/uuid.hpp>
+
 using fuse_core::UUID;
 using UUIDs = std::vector<fuse_core::UUID>;
 
-
 TEST(UUID, Generate)
 {
-  // These tests are mostly just calling the different generate() signatures to verify they compile and work.
-  // It's hard to validate that the "correct" random number has been generated. :)
+  // These tests are mostly just calling the different generate() signatures to verify they compile
+  // and work. It's hard to validate that the "correct" random number has been generated. :)
 
   // Just get a random number
   {
@@ -56,7 +54,8 @@ TEST(UUID, Generate)
     UUID id2 = fuse_core::uuid::generate();
     ASSERT_NE(id1, id2);
   }
-  // Generate a UUID from a data buffer. The same buffer contents should always generate the same UUID.
+  // Generate a UUID from a data buffer. The same buffer contents should always generate the same
+  // UUID.
   {
     std::string buffer1 = "Curse your sudden but inevitable betrayal!";
     std::string buffer2 = "Man walks down the street in a hat like that, you know he's not afraid of anything.";
@@ -80,7 +79,8 @@ TEST(UUID, Generate)
     ASSERT_EQ(id7, id8);
     ASSERT_NE(id7, id9);
   }
-  // Generate a UUID from a namespace and a data buffer. The same name and buffer should always generate the same UUID.
+  // Generate a UUID from a namespace and a data buffer. The same name and buffer should always
+  // generate the same UUID.
   {
     std::string name1 = "Jayne";
     std::string name2 = "Hoban";
@@ -113,12 +113,12 @@ TEST(UUID, Generate)
     ASSERT_NE(id9, id11);
     ASSERT_NE(id9, id12);
   }
-  // Generate a UUID from a namespace and a ros::Time
+  // Generate a UUID from a namespace and a rclcpp::Time
   {
     std::string name1 = "Cobb";
     std::string name2 = "Frye";
-    ros::Time stamp1(1234, 5678);
-    ros::Time stamp2(1235, 5678);
+    rclcpp::Time stamp1(1234, 5678);
+    rclcpp::Time stamp2(1235, 5678);
 
     UUID id1 = fuse_core::uuid::generate(name1, stamp1);
     UUID id2 = fuse_core::uuid::generate(name1, stamp1);
@@ -128,12 +128,12 @@ TEST(UUID, Generate)
     ASSERT_NE(id1, id3);
     ASSERT_NE(id1, id4);
   }
-  // Generate a UUID from a namespace, a ros::Time, and another UUID
+  // Generate a UUID from a namespace, a rclcpp::Time, and another UUID
   {
     std::string name1 = "Book";
     std::string name2 = "Tam";
-    ros::Time stamp1(1234, 5678);
-    ros::Time stamp2(1235, 5678);
+    rclcpp::Time stamp1(1234, 5678);
+    rclcpp::Time stamp2(1235, 5678);
     UUID uuid1 = fuse_core::uuid::generate();
     UUID uuid2 = fuse_core::uuid::generate();
 
@@ -183,7 +183,7 @@ TEST(UUID, CollisionSingleThread)
 
   // Check for duplicates
   std::unordered_set<fuse_core::UUID> unique_uuids;
-  for (const auto& uuid : raw_uuids)
+  for (auto const& uuid : raw_uuids)
   {
     ASSERT_TRUE(unique_uuids.find(uuid) == unique_uuids.end()) << "UUIDs before duplicate " << unique_uuids.size();
     unique_uuids.insert(uuid);
@@ -209,16 +209,10 @@ TEST(UUID, CollisionManyThreads)
   std::unordered_set<fuse_core::UUID> unique_uuids;
   for (size_t i = 0; i < raw_uuids.size(); ++i)
   {
-    for (const auto& uuid : raw_uuids[i])
+    for (auto const& uuid : raw_uuids[i])
     {
       ASSERT_TRUE(unique_uuids.find(uuid) == unique_uuids.end()) << "UUIDs before duplicate " << unique_uuids.size();
       unique_uuids.insert(uuid);
     }
   }
-}
-
-int main(int argc, char **argv)
-{
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

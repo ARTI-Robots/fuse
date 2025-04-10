@@ -1,4 +1,4 @@
-<library path="lib/libfuse_loss">
+<library path="fuse_loss">
   <!--
   Loss functions are M-estimators that take the squared norm of a residual block 'r' and try to reduce the effect of
   outliers by replacing the squared residuals 's = r^2' used in the standard Least-Squares problem by another function
@@ -69,7 +69,7 @@
   </class>
   <class type="fuse_loss::ComposedLoss" base_class_type="fuse_core::Loss">
     <description>
-    Composition of two loss functions. The error is the result of first evaluating 'g' followed by 'f' to yeild the
+    Composition of two loss functions. The error is the result of first evaluating 'g' followed by 'f' to yield the
     composition 'f(g(s))' for the squared residual 's':
 
     rho(s) = f_rho(g_rho(s))

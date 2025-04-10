@@ -31,14 +31,13 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <test/example_loss.h>
-
 #include <gtest/gtest.h>
 
+#include "example_loss.hpp"
 
 TEST(Loss, Constructor)
 {
-  const double a{ 0.3 };
+  double const a{ 0.3 };
   ExampleLoss loss(a);
   ASSERT_EQ(a, loss.a);
 
@@ -50,10 +49,4 @@ TEST(Loss, Constructor)
   {
     delete loss_function;
   }
-}
-
-int main(int argc, char **argv)
-{
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

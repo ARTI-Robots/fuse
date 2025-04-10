@@ -37,29 +37,28 @@
 #include <OgreSceneManager.h>
 #include <OgreSceneNode.h>
 
-#include <rviz/display_context.h>
-#include <rviz/frame_manager.h>
+#include <rviz_common/display_context.hpp>
+#include <rviz_common/properties/bool_property.hpp>
+#include <rviz_common/properties/parse_color.hpp>
+#include <rviz_common/properties/property.hpp>
 
-#include <rviz/properties/parse_color.h>
-#include <rviz/properties/property.h>
 #endif  // Q_MOC_RUN
 
-#include <fuse_viz/pose_2d_stamped_property.h>
-#include <fuse_viz/pose_2d_stamped_visual.h>
-#include <fuse_viz/relative_pose_2d_stamped_constraint_property.h>
-#include <fuse_viz/relative_pose_2d_stamped_constraint_visual.h>
-#include <fuse_viz/serialized_graph_display.h>
+#include <fuse_constraints/relative_pose_2d_stamped_constraint.hpp>
+#include <fuse_core/graph.hpp>
+#include <fuse_core/uuid.hpp>
+#include <fuse_variables/orientation_2d_stamped.hpp>
+#include <fuse_variables/position_2d_stamped.hpp>
+#include <fuse_viz/pose_2d_stamped_property.hpp>
+#include <fuse_viz/pose_2d_stamped_visual.hpp>
+#include <fuse_viz/relative_pose_2d_stamped_constraint_property.hpp>
+#include <fuse_viz/relative_pose_2d_stamped_constraint_visual.hpp>
+#include <fuse_viz/serialized_graph_display.hpp>
 
-#include <fuse_constraints/relative_pose_2d_stamped_constraint.h>
-#include <fuse_core/graph.h>
-#include <fuse_core/uuid.h>
-#include <fuse_variables/orientation_2d_stamped.h>
-#include <fuse_variables/position_2d_stamped.h>
-
-#include <boost/range.hpp>
-
-namespace rviz
+namespace fuse_viz
 {
+
+using rviz_common::properties::BoolProperty;
 
 SerializedGraphDisplay::SerializedGraphDisplay()
 {
@@ -119,15 +118,16 @@ void SerializedGraphDisplay::onDisable()
   root_node_->setVisible(false);
 }
 
-void SerializedGraphDisplay::load(const Config& config)
+void SerializedGraphDisplay::load(rviz_common::Config const& config)
 {
   MFDClass::load(config);
 
-  // Cache constraint config for each source in order to apply it when the RelativePose2DStampedConstraintProperty is
-  // created the first time a constraint of each source is present in the graph:
-  const auto constraints_config = config.mapGetChild("Constraints");
+  // Cache constraint config for each source in order to apply it when the
+  // RelativePose2DStampedConstraintProperty is created the first time a constraint of each source
+  // is present in the graph:
+  auto const constraints_config = config.mapGetChild("Constraints");
 
-  for (Config::MapIterator iter = constraints_config.mapIterator(); iter.isValid(); iter.advance())
+  for (rviz_common::Config::MapIterator iter = constraints_config.mapIterator(); iter.isValid(); iter.advance())
   {
     constraint_source_configs_[iter.currentKey().toStdString()] = iter.currentChild();
   }
@@ -140,7 +140,7 @@ void SerializedGraphDisplay::updateShowVariables()
 
 void SerializedGraphDisplay::updateShowConstraints()
 {
-  const auto visible = show_constraints_property_->getBool();
+  auto const visible = show_constraints_property_->getBool();
 
   for (auto& entry : constraint_source_properties_)
   {
@@ -164,14 +164,15 @@ void SerializedGraphDisplay::clear()
   constraints_changed_map_.clear();
 }
 
-void SerializedGraphDisplay::processMessage(const fuse_msgs::SerializedGraph::ConstPtr& msg)
+void SerializedGraphDisplay::processMessage(fuse_msgs::msg::SerializedGraph::ConstSharedPtr msg)
 {
   Ogre::Vector3 position;
   Ogre::Quaternion orientation;
   if (!context_->getFrameManager()->getTransform(msg->header, position, orientation))
   {
-    ROS_DEBUG_STREAM("Error transforming from frame '" << msg->header.frame_id << "' to frame '"
-                                                       << qPrintable(fixed_frame_) << "'");
+    RCLCPP_DEBUG_STREAM(rclcpp::get_logger("fuse"), "Error transforming from frame '"
+                                                        << msg->header.frame_id << "' to frame '"
+                                                        << qPrintable(fixed_frame_) << "'");
   }
 
   root_node_->setPosition(position);
@@ -187,62 +188,64 @@ void SerializedGraphDisplay::processMessage(const fuse_msgs::SerializedGraph::Co
     entry.second = false;
   }
 
-  const auto graph = graph_deserializer_.deserialize(msg);
+  auto const graph = graph_deserializer_.deserialize(msg);
 
-  for (const auto& variable : graph->getVariables())
+  for (auto const& variable : graph->getVariables())
   {
-    const auto orientation = dynamic_cast<const fuse_variables::Orientation2DStamped*>(&variable);
+    auto const orientation = dynamic_cast<fuse_variables::Orientation2DStamped const*>(&variable);
     if (!orientation)
     {
       continue;
     }
 
-    const auto position_uuid = fuse_variables::Position2DStamped(orientation->stamp(), orientation->deviceId()).uuid();
+    auto const position_uuid = fuse_variables::Position2DStamped(orientation->stamp(), orientation->deviceId()).uuid();
     if (!graph->variableExists(position_uuid))
     {
       continue;
     }
 
-    const auto position = dynamic_cast<const fuse_variables::Position2DStamped*>(&graph->getVariable(position_uuid));
+    auto const position = dynamic_cast<fuse_variables::Position2DStamped const*>(&graph->getVariable(position_uuid));
 
     variable_property_->createAndInsertOrUpdateVisual(scene_manager_, root_node_, *position, *orientation);
 
     variables_changed_map_[position_uuid] = true;
   }
 
-  for (const auto& constraint : graph->getConstraints())
+  for (auto const& constraint : graph->getConstraints())
   {
-    const auto relative_pose = dynamic_cast<const fuse_constraints::RelativePose2DStampedConstraint*>(&constraint);
+    auto const relative_pose = dynamic_cast<fuse_constraints::RelativePose2DStampedConstraint const*>(&constraint);
     if (!relative_pose)
     {
       continue;
     }
 
-    const auto constraint_uuid = constraint.uuid();
-    const auto& constraint_source = constraint.source();
+    auto const constraint_uuid = constraint.uuid();
+    auto const& constraint_source = constraint.source();
 
     if (source_color_map_.find(constraint_source) == source_color_map_.end())
     {
       // Generate hue color automatically based on the number of sources including the new one (n)
-      // The hue is computed in such a way that the (dynamic) colormap is always well spread along the spectrum. This is
-      // achieved by traversing a virtual complete binary tree in breadth-first order. Each node represents a sampling
-      // position in the hue interval (0, 1) based on the current level and the number of nodes in that level (m)
-      const auto n = source_color_map_.size() + 1;
+      // The hue is computed in such a way that the (dynamic) colormap is always well spread along
+      // the spectrum. This is achieved by traversing a virtual complete binary tree in breadth-
+      // first order. Each node represents a sampling position in the hue interval (0, 1) based on
+      // the current level and the number of nodes in that level (m)
+      auto const n = source_color_map_.size() + 1;
       const size_t level = std::floor(std::log2(n));
-      const auto m = n + 1 - std::pow(2, level);
-      const auto hue = (2 * (m - 1) + 1) / std::pow(2, level + 1);
+      auto const m = n + 1 - std::pow(2, level);
+      auto const hue = (2 * (m - 1) + 1) / std::pow(2, level + 1);
 
       auto& source_color = source_color_map_[constraint_source];
       source_color.setHSB(hue, 1.0, 1.0);
 
       // Insert constraint sorted alphabetically:
-      const auto description = constraint_source + ' ' + constraint.type() + " constraint.";
+      auto const description = constraint_source + ' ' + constraint.type() + " constraint.";
 
-      const auto constraint_source_property = new RelativePose2DStampedConstraintProperty(
-          QString::fromStdString(constraint_source), true, QString::fromStdString(description), nullptr,
-          SLOT(queueRender()), this);
+      auto const constraint_source_property =
+          new RelativePose2DStampedConstraintProperty(QString::fromStdString(constraint_source), true,
+                                                      QString::fromStdString(description), nullptr, SLOT(queueRender()),
+                                                      this);
 
-      const auto result = constraint_source_properties_.insert(
+      auto const result = constraint_source_properties_.insert(
           { constraint_source, constraint_source_property });  // NOLINT(whitespace/braces)
 
       if (!result.second)
@@ -253,11 +256,11 @@ void SerializedGraphDisplay::processMessage(const fuse_msgs::SerializedGraph::Co
       }
 
       show_constraints_property_->addChild(constraint_source_property,
-                                          std::distance(constraint_source_properties_.begin(), result.first));
+                                           std::distance(constraint_source_properties_.begin(), result.first));
 
       if (constraint_source_configs_.find(constraint_source) == constraint_source_configs_.end())
       {
-        constraint_source_properties_[constraint_source]->setColor(ogreToQt(source_color));
+        constraint_source_properties_[constraint_source]->setColor(rviz_common::properties::ogreToQt(source_color));
       }
       else
       {
@@ -278,7 +281,7 @@ void SerializedGraphDisplay::processMessage(const fuse_msgs::SerializedGraph::Co
     constraints_changed_map_[constraint_uuid] = true;
   }
 
-  for (const auto& entry : variables_changed_map_)
+  for (auto const& entry : variables_changed_map_)
   {
     if (!entry.second)
     {
@@ -298,7 +301,7 @@ void SerializedGraphDisplay::processMessage(const fuse_msgs::SerializedGraph::Co
     }
   }
 
-  for (const auto& entry : constraints_changed_map_)
+  for (auto const& entry : constraints_changed_map_)
   {
     if (!entry.second)
     {
@@ -320,7 +323,8 @@ void SerializedGraphDisplay::processMessage(const fuse_msgs::SerializedGraph::Co
   }
 }
 
-}  // namespace rviz
+}  // namespace fuse_viz
 
-#include <pluginlib/class_list_macros.h>
-PLUGINLIB_EXPORT_CLASS(rviz::SerializedGraphDisplay, rviz::Display)
+#include <pluginlib/class_list_macros.hpp>
+
+PLUGINLIB_EXPORT_CLASS(fuse_viz::SerializedGraphDisplay, rviz_common::Display)

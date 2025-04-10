@@ -31,24 +31,22 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_core/constraint.h>
-#include <fuse_core/serialization.h>
-#include <fuse_core/uuid.h>
-#include <fuse_graphs/hash_graph.h>
-
-#include <test/example_variable.h>
-
 #include <benchmark/benchmark.h>
-
-#include <boost/serialization/access.hpp>
-#include <boost/serialization/base_object.hpp>
-#include <boost/serialization/export.hpp>
 #include <ceres/dynamic_autodiff_cost_function.h>
 
 #include <algorithm>
 #include <iterator>
-#include <vector>
 #include <string>
+#include <vector>
+
+#include <boost/serialization/access.hpp>
+#include <boost/serialization/base_object.hpp>
+#include <boost/serialization/export.hpp>
+#include "example_variable.hpp"
+#include <fuse_core/constraint.hpp>
+#include <fuse_core/serialization.hpp>
+#include <fuse_core/uuid.hpp>
+#include <fuse_graphs/hash_graph.hpp>
 
 /**
  * @brief Testable fuse_graphs::HashGraph that exposes the protected createProblem method as public
@@ -65,8 +63,7 @@ public:
 class ExampleFunctor
 {
 public:
-  explicit ExampleFunctor(const std::vector<double>& b) :
-    b_(b)
+  explicit ExampleFunctor(std::vector<double> const& b) : b_(b)
   {
   }
 
@@ -90,18 +87,19 @@ private:
 class ExampleConstraint : public fuse_core::Constraint
 {
 public:
-  FUSE_CONSTRAINT_DEFINITIONS(ExampleConstraint);
+  FUSE_CONSTRAINT_DEFINITIONS(ExampleConstraint)
 
   ExampleConstraint() = default;
 
-  template<typename VariableUuidIterator>
-  explicit ExampleConstraint(const std::string& source, VariableUuidIterator first, VariableUuidIterator last) :
-    fuse_core::Constraint(source, first, last),
-    data(std::distance(first, last), 0.0)
+  template <typename VariableUuidIterator>
+  explicit ExampleConstraint(std::string const& source, VariableUuidIterator first, VariableUuidIterator last)
+    : fuse_core::Constraint(source, first, last), data(std::distance(first, last), 0.0)
   {
   }
 
-  void print(std::ostream& /*stream = std::cout*/) const override {}
+  void print(std::ostream& /*stream = std::cout*/) const override
+  {
+  }
   ceres::CostFunction* costFunction() const override
   {
     auto cost_function = new ceres::DynamicAutoDiffCostFunction<ExampleFunctor>(new ExampleFunctor(data));
@@ -123,16 +121,17 @@ private:
   friend class boost::serialization::access;
 
   /**
-   * @brief The Boost Serialize method that serializes all of the data members in to/out of the archive
+   * @brief The Boost Serialize method that serializes all of the data members in to/out of the
+   *        archive
    *
    * @param[in/out] archive - The archive object that holds the serialized class members
    * @param[in] version - The version of the archive being read/written. Generally unused.
    */
-  template<class Archive>
-  void serialize(Archive& archive, const unsigned int /* version */)
+  template <class Archive>
+  void serialize(Archive& archive, unsigned int const /* version */)
   {
-    archive & boost::serialization::base_object<fuse_core::Constraint>(*this);
-    archive & data;
+    archive& boost::serialization::base_object<fuse_core::Constraint>(*this);
+    archive& data;
   }
 };
 
@@ -158,7 +157,7 @@ TestableHashGraph makeTestableHashGraph(const size_t num_constraints, const size
                     []() { return ExampleVariable::make_shared(); });  // NOLINT
 
     // Add variables to the graph
-    for (const auto& variable : variables)
+    for (auto const& variable : variables)
     {
       graph.addVariable(variable);
     }
@@ -167,7 +166,7 @@ TestableHashGraph makeTestableHashGraph(const size_t num_constraints, const size
     std::vector<fuse_core::UUID> variable_uuids;
     variable_uuids.reserve(variables.size());
     std::transform(variables.begin(), variables.end(), std::back_inserter(variable_uuids),
-                   [](const auto& variable) { return variable->uuid(); });  // NOLINT
+                   [](auto const& variable) { return variable->uuid(); });  // NOLINT
 
     graph.addConstraint(ExampleConstraint::make_shared("test", variable_uuids.begin(), variable_uuids.end()));
   }
@@ -177,7 +176,7 @@ TestableHashGraph makeTestableHashGraph(const size_t num_constraints, const size
 
 static void BM_createProblem(benchmark::State& state)
 {
-  const auto graph = makeTestableHashGraph(state.range(0), state.range(1));
+  auto const graph = makeTestableHashGraph(state.range(0), state.range(1));
 
   ceres::Problem problem;
 
@@ -187,6 +186,6 @@ static void BM_createProblem(benchmark::State& state)
   }
 }
 
-BENCHMARK(BM_createProblem)->RangeMultiplier(2)->Ranges({{200, 4000}, {2, 12}});  // NOLINT
+BENCHMARK(BM_createProblem)->RangeMultiplier(2)->Ranges({ { 200, 4000 }, { 2, 12 } });  // NOLINT
 
 BENCHMARK_MAIN();

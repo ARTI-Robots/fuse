@@ -32,29 +32,32 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <fuse_viz/mapped_covariance_property.h>
-#include <fuse_viz/mapped_covariance_visual.h>
-#include <fuse_viz/relative_pose_2d_stamped_constraint_property.h>
-#include <fuse_viz/relative_pose_2d_stamped_constraint_visual.h>
-
-#include <fuse_constraints/relative_pose_2d_stamped_constraint.h>
-#include <fuse_core/graph.h>
-
-#include <rviz/properties/color_property.h>
-#include <rviz/properties/float_property.h>
-
-#include <QColor>
-
 #include <OgreSceneManager.h>
 #include <OgreSceneNode.h>
+#include <QColor>
 
-namespace rviz
+#include <fuse_constraints/relative_pose_2d_stamped_constraint.hpp>
+#include <fuse_core/graph.hpp>
+#include <fuse_viz/mapped_covariance_property.hpp>
+#include <fuse_viz/mapped_covariance_visual.hpp>
+#include <fuse_viz/relative_pose_2d_stamped_constraint_property.hpp>
+#include <fuse_viz/relative_pose_2d_stamped_constraint_visual.hpp>
+#include <rviz_common/properties/bool_property.hpp>
+#include <rviz_common/properties/color_property.hpp>
+#include <rviz_common/properties/float_property.hpp>
+
+namespace fuse_viz
 {
+using rviz_common::properties::BoolProperty;
+using rviz_common::properties::ColorProperty;
+using rviz_common::properties::FloatProperty;
+using rviz_common::properties::Property;
 
 RelativePose2DStampedConstraintProperty::RelativePose2DStampedConstraintProperty(
-    const QString& name, bool default_value, const QString& description, rviz::Property* parent,
-    const char* changed_slot, QObject* receiver)
-  // NOTE: changed_slot and receiver aren't passed to BoolProperty here, but initialized at the end of this constructor
+    QString const& name, bool default_value, QString const& description, Property* parent, char const* changed_slot,
+    QObject* receiver)
+  // NOTE: changed_slot and receiver aren't passed to BoolProperty here, but initialized at the end of
+  // this constructor
   : BoolProperty(name, default_value, description, parent)
 {
   color_property_ =
@@ -125,7 +128,7 @@ RelativePose2DStampedConstraintProperty::RelativePose2DStampedConstraintProperty
 
 RelativePose2DStampedConstraintProperty::VisualPtr RelativePose2DStampedConstraintProperty::createAndInsertVisual(
     Ogre::SceneManager* scene_manager, Ogre::SceneNode* parent_node,
-    const fuse_constraints::RelativePose2DStampedConstraint& constraint, const fuse_core::Graph& graph)
+    fuse_constraints::RelativePose2DStampedConstraint const& constraint, fuse_core::Graph const& graph)
 {
   VisualPtr visual{ new Visual(scene_manager, parent_node, constraint) };
   constraints_[constraint.uuid()] = visual;
@@ -149,7 +152,7 @@ RelativePose2DStampedConstraintProperty::VisualPtr RelativePose2DStampedConstrai
   return visual;
 }
 
-void RelativePose2DStampedConstraintProperty::eraseVisual(const fuse_core::UUID& uuid)
+void RelativePose2DStampedConstraintProperty::eraseVisual(fuse_core::UUID const& uuid)
 {
   covariance_property_->eraseVisual(fuse_core::uuid::to_string(uuid));
   constraints_.erase(uuid);
@@ -161,7 +164,7 @@ void RelativePose2DStampedConstraintProperty::clearVisual()
   constraints_.clear();
 }
 
-void RelativePose2DStampedConstraintProperty::setColor(const QColor& color)
+void RelativePose2DStampedConstraintProperty::setColor(QColor const& color)
 {
   color_property_->setColor(color);
 }
@@ -254,74 +257,74 @@ void RelativePose2DStampedConstraintProperty::updateTextScale()
   }
 }
 
-void RelativePose2DStampedConstraintProperty::updateColor(const VisualPtr& constraint)
+void RelativePose2DStampedConstraintProperty::updateColor(VisualPtr const& constraint)
 {
-  const auto color = color_property_->getColor();
+  auto const color = color_property_->getColor();
 
   constraint->setRelativePoseLineColor(color.redF(), color.greenF(), color.blueF(),
                                        relative_pose_line_alpha_property_->getFloat());
   constraint->setErrorLineColor(color.redF(), color.greenF(), color.blueF(), error_line_alpha_property_->getFloat());
 }
 
-void RelativePose2DStampedConstraintProperty::updateErrorLineAlpha(const VisualPtr& constraint)
+void RelativePose2DStampedConstraintProperty::updateErrorLineAlpha(VisualPtr const& constraint)
 {
-  const auto color = color_property_->getColor();
+  auto const color = color_property_->getColor();
 
   constraint->setErrorLineColor(color.redF(), color.greenF(), color.blueF(), error_line_alpha_property_->getFloat());
 }
 
-void RelativePose2DStampedConstraintProperty::updateErrorLineWidth(const VisualPtr& constraint)
+void RelativePose2DStampedConstraintProperty::updateErrorLineWidth(VisualPtr const& constraint)
 {
   constraint->setErrorLineWidth(error_line_width_property_->getFloat());
 }
 
-void RelativePose2DStampedConstraintProperty::updateLossMinBrightness(const VisualPtr& constraint)
+void RelativePose2DStampedConstraintProperty::updateLossMinBrightness(VisualPtr const& constraint)
 {
   constraint->setLossMinBrightness(loss_min_brightness_property_->getFloat());
 
   updateErrorLineAlpha(constraint);
 }
 
-void RelativePose2DStampedConstraintProperty::updateRelativePoseAxesAlpha(const VisualPtr& constraint)
+void RelativePose2DStampedConstraintProperty::updateRelativePoseAxesAlpha(VisualPtr const& constraint)
 {
   constraint->setRelativePoseAxesAlpha(relative_pose_axes_alpha_property_->getFloat());
 }
 
-void RelativePose2DStampedConstraintProperty::updateRelativePoseAxesScale(const VisualPtr& constraint)
+void RelativePose2DStampedConstraintProperty::updateRelativePoseAxesScale(VisualPtr const& constraint)
 {
-  constraint->setRelativePoseAxesScale(Ogre::Vector3{ relative_pose_axes_scale_property_->getFloat() });  // NOLINT
+  constraint->setRelativePoseAxesScale(Ogre::Vector3{ relative_pose_axes_scale_property_->getFloat() });
 }
 
-void RelativePose2DStampedConstraintProperty::updateRelativePoseLineAlpha(const VisualPtr& constraint)
+void RelativePose2DStampedConstraintProperty::updateRelativePoseLineAlpha(VisualPtr const& constraint)
 {
-  const auto color = color_property_->getColor();
+  auto const color = color_property_->getColor();
 
   constraint->setRelativePoseLineColor(color.redF(), color.greenF(), color.blueF(),
                                        relative_pose_line_alpha_property_->getFloat());
 }
 
-void RelativePose2DStampedConstraintProperty::updateRelativePoseLineWidth(const VisualPtr& constraint)
+void RelativePose2DStampedConstraintProperty::updateRelativePoseLineWidth(VisualPtr const& constraint)
 {
   constraint->setRelativePoseLineWidth(relative_pose_line_width_property_->getFloat());
 }
 
-void RelativePose2DStampedConstraintProperty::updateShowText(const VisualPtr& constraint)
+void RelativePose2DStampedConstraintProperty::updateShowText(VisualPtr const& constraint)
 {
   constraint->setTextVisible(show_text_property_->getBool());
 }
 
-void RelativePose2DStampedConstraintProperty::updateTextScale(const VisualPtr& constraint)
+void RelativePose2DStampedConstraintProperty::updateTextScale(VisualPtr const& constraint)
 {
-  constraint->setTextScale(Ogre::Vector3{ text_scale_property_->getFloat() });  // NOLINT(whitespace/braces)
+  constraint->setTextScale(Ogre::Vector3{ text_scale_property_->getFloat() });  // NOLINT
 }
 
-void RelativePose2DStampedConstraintProperty::updateVisibility(const VisualPtr& constraint)
+void RelativePose2DStampedConstraintProperty::updateVisibility(VisualPtr const& constraint)
 {
-  const auto visible = getBool();
+  auto const visible = getBool();
 
   constraint->setVisible(visible);
   constraint->setTextVisible(visible && show_text_property_->getBool());
   constraint->getCovariance()->setVisible(visible && covariance_property_->getBool());
 }
 
-}  // end namespace rviz
+}  // end namespace fuse_viz

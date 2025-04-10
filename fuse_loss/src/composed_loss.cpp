@@ -31,35 +31,33 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_loss/composed_loss.h>
-#include <fuse_loss/trivial_loss.h>
-
-#include <fuse_core/parameter.h>
-#include <pluginlib/class_list_macros.h>
-#include <ros/node_handle.h>
-
-#include <boost/serialization/export.hpp>
-
 #include <memory>
 #include <ostream>
 #include <string>
 
+#include <boost/serialization/export.hpp>
+#include <fuse_core/parameter.hpp>
+#include <fuse_loss/composed_loss.hpp>
+#include <fuse_loss/trivial_loss.hpp>
+#include <pluginlib/class_list_macros.hpp>
 
 namespace fuse_loss
 {
 
-ComposedLoss::ComposedLoss(const std::shared_ptr<fuse_core::Loss>& f_loss,
-                           const std::shared_ptr<fuse_core::Loss>& g_loss)
+ComposedLoss::ComposedLoss(std::shared_ptr<fuse_core::Loss> const& f_loss,
+                           std::shared_ptr<fuse_core::Loss> const& g_loss)
   : f_loss_(f_loss), g_loss_(g_loss)
 {
 }
 
-void ComposedLoss::initialize(const std::string& name)
+void ComposedLoss::initialize(
+    fuse_core::node_interfaces::NodeInterfaces<fuse_core::node_interfaces::Base, fuse_core::node_interfaces::Logging,
+                                               fuse_core::node_interfaces::Parameters>
+        interfaces,
+    std::string const& name)
 {
-  ros::NodeHandle private_node_handle(name);
-
-  f_loss_ = fuse_core::loadLossConfig(private_node_handle, "f_loss");
-  g_loss_ = fuse_core::loadLossConfig(private_node_handle, "g_loss");
+  f_loss_ = fuse_core::loadLossConfig(interfaces, name + ".f_loss");
+  g_loss_ = fuse_core::loadLossConfig(interfaces, name + ".g_loss");
 }
 
 void ComposedLoss::print(std::ostream& stream) const

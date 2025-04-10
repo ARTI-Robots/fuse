@@ -31,51 +31,56 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_core/serialization.h>
-#include <fuse_core/variable.h>
-#include <fuse_variables/fixed_size_variable.h>
+#include <gtest/gtest.h>
 
 #include <boost/serialization/access.hpp>
 #include <boost/serialization/base_object.hpp>
-#include <gtest/gtest.h>
-
+#include <fuse_core/serialization.hpp>
+#include <fuse_core/variable.hpp>
+#include <fuse_variables/fixed_size_variable.hpp>
 
 class TestVariable : public fuse_variables::FixedSizeVariable<2>
 {
 public:
-  FUSE_VARIABLE_DEFINITIONS(TestVariable);
+  FUSE_VARIABLE_DEFINITIONS(TestVariable)
 
-  TestVariable() :
-    fuse_variables::FixedSizeVariable<2>(fuse_core::uuid::generate())
-  {}
-  virtual ~TestVariable() = default;
+  TestVariable() : fuse_variables::FixedSizeVariable<2>(fuse_core::uuid::generate())
+  {
+  }
+  ~TestVariable() override = default;
+  TestVariable(TestVariable const&) = default;
+  TestVariable(TestVariable&&) = default;
+  TestVariable& operator=(TestVariable const&) = default;
+  TestVariable& operator=(TestVariable&&) = default;
 
-  void print(std::ostream& /*stream = std::cout*/) const override {}
+  void print(std::ostream& /*stream = std::cout*/) const override
+  {
+  }
 
 private:
   // Allow Boost Serialization access to private methods
   friend class boost::serialization::access;
 
   /**
-   * @brief The Boost Serialize method that serializes all of the data members in to/out of the archive
+   * @brief The Boost Serialize method that serializes all of the data members in to/out of the
+   *        archive
    *
    * @param[in/out] archive - The archive object that holds the serialized class members
    * @param[in] version - The version of the archive being read/written. Generally unused.
    */
-  template<class Archive>
-  void serialize(Archive& archive, const unsigned int /* version */)
+  template <class Archive>
+  void serialize(Archive& archive, unsigned int const /* version */)
   {
-    archive & boost::serialization::base_object<fuse_variables::FixedSizeVariable<2>>(*this);
+    archive& boost::serialization::base_object<fuse_variables::FixedSizeVariable<2>>(*this);
   }
 };
-
 
 TEST(FixedSizeVariable, Size)
 {
   // Verify the expected size is returned
-  TestVariable variable;
-  EXPECT_EQ(2u, variable.size());  // base class interface
-  EXPECT_EQ(2u, TestVariable::SIZE);  // static member variable
+  TestVariable const variable;
+  EXPECT_EQ(2u, variable.size());        // base class interface
+  EXPECT_EQ(2u, TestVariable::varSize);  // static member variable
 }
 
 TEST(FixedSizeVariable, Data)
@@ -84,7 +89,7 @@ TEST(FixedSizeVariable, Data)
   TestVariable variable;
   EXPECT_NO_THROW(variable.data()[0] = 1.0);
   EXPECT_NO_THROW(variable.data()[1] = 2.0);
-  const TestVariable& const_variable = variable;
+  TestVariable const& const_variable = variable;
   bool success = true;
   EXPECT_NO_THROW(success = success && const_variable.data()[0] == 1.0);
   EXPECT_NO_THROW(success = success && const_variable.data()[1] == 2.0);
@@ -99,17 +104,11 @@ TEST(FixedSizeVariable, Array)
   EXPECT_NO_THROW(variable.array().at(1) = 2.0);
   EXPECT_NO_THROW(variable.array().front() = 3.0);
   EXPECT_NO_THROW(variable.array().back() = 4.0);
-  const TestVariable& const_variable = variable;
+  TestVariable const& const_variable = variable;
   bool success = true;
   EXPECT_NO_THROW(success = success && const_variable.array()[0] == 3.0);
   EXPECT_NO_THROW(success = success && const_variable.array().at(1) == 4.0);
   EXPECT_NO_THROW(success = success && const_variable.array().front() == 3.0);
   EXPECT_NO_THROW(success = success && const_variable.array().back() == 4.0);
   EXPECT_TRUE(success);
-}
-
-int main(int argc, char **argv)
-{
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

@@ -31,18 +31,6 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_core/constraint.h>
-#include <fuse_core/transaction.h>
-#include <fuse_core/serialization.h>
-#include <fuse_core/uuid.h>
-#include <fuse_core/variable.h>
-#include <fuse_optimizers/variable_stamp_index.h>
-#include <fuse_variables/stamped.h>
-#include <ros/time.h>
-
-#include <boost/serialization/access.hpp>
-#include <boost/serialization/base_object.hpp>
-#include <boost/serialization/export.hpp>
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -51,6 +39,17 @@
 #include <string>
 #include <vector>
 
+#include <boost/serialization/access.hpp>
+#include <boost/serialization/base_object.hpp>
+#include <boost/serialization/export.hpp>
+#include <fuse_core/constraint.hpp>
+#include <fuse_core/serialization.hpp>
+#include <fuse_core/transaction.hpp>
+#include <fuse_core/uuid.hpp>
+#include <fuse_core/variable.hpp>
+#include <fuse_optimizers/variable_stamp_index.hpp>
+#include <fuse_variables/stamped.hpp>
+#include <rclcpp/time.hpp>
 
 /**
  * @brief Create a simple stamped Variable for testing
@@ -58,12 +57,10 @@
 class StampedVariable : public fuse_core::Variable, public fuse_variables::Stamped
 {
 public:
-  FUSE_VARIABLE_DEFINITIONS(StampedVariable);
+  FUSE_VARIABLE_DEFINITIONS(StampedVariable)
 
-  explicit StampedVariable(const ros::Time& stamp = ros::Time(0, 0)) :
-    fuse_core::Variable(fuse_core::uuid::generate()),
-    fuse_variables::Stamped(stamp),
-    data_{}
+  explicit StampedVariable(rclcpp::Time const& stamp = rclcpp::Time(0, 0, RCL_ROS_TIME))
+    : fuse_core::Variable(fuse_core::uuid::generate()), fuse_variables::Stamped(stamp), data_{}
   {
   }
 
@@ -72,7 +69,7 @@ public:
     return 1;
   }
 
-  const double* data() const override
+  double const* data() const override
   {
     return &data_;
   }
@@ -93,17 +90,18 @@ private:
   friend class boost::serialization::access;
 
   /**
-   * @brief The Boost Serialize method that serializes all of the data members in to/out of the archive
+   * @brief The Boost Serialize method that serializes all of the data members in to/out of the
+   *        archive
    *
    * @param[in/out] archive - The archive object that holds the serialized class members
    * @param[in] version - The version of the archive being read/written. Generally unused.
    */
-  template<class Archive>
-  void serialize(Archive& archive, const unsigned int /* version */)
+  template <class Archive>
+  void serialize(Archive& archive, unsigned int const /* version */)
   {
-    archive & boost::serialization::base_object<fuse_core::Variable>(*this);
-    archive & boost::serialization::base_object<fuse_variables::Stamped>(*this);
-    archive & data_;
+    archive& boost::serialization::base_object<fuse_core::Variable>(*this);
+    archive& boost::serialization::base_object<fuse_variables::Stamped>(*this);
+    archive& data_;
   }
 };
 
@@ -115,11 +113,9 @@ BOOST_CLASS_EXPORT(StampedVariable);
 class UnstampedVariable : public fuse_core::Variable
 {
 public:
-  FUSE_VARIABLE_DEFINITIONS(UnstampedVariable);
+  FUSE_VARIABLE_DEFINITIONS(UnstampedVariable)
 
-  UnstampedVariable() :
-    fuse_core::Variable(fuse_core::uuid::generate()),
-    data_{}
+  UnstampedVariable() : fuse_core::Variable(fuse_core::uuid::generate()), data_{}
   {
   }
 
@@ -128,7 +124,7 @@ public:
     return 1;
   }
 
-  const double* data() const override
+  double const* data() const override
   {
     return &data_;
   }
@@ -149,16 +145,17 @@ private:
   friend class boost::serialization::access;
 
   /**
-   * @brief The Boost Serialize method that serializes all of the data members in to/out of the archive
+   * @brief The Boost Serialize method that serializes all of the data members in to/out of the
+   *        archive
    *
    * @param[in/out] archive - The archive object that holds the serialized class members
    * @param[in] version - The version of the archive being read/written. Generally unused.
    */
-  template<class Archive>
-  void serialize(Archive& archive, const unsigned int /* version */)
+  template <class Archive>
+  void serialize(Archive& archive, unsigned int const /* version */)
   {
-    archive & boost::serialization::base_object<fuse_core::Variable>(*this);
-    archive & data_;
+    archive& boost::serialization::base_object<fuse_core::Variable>(*this);
+    archive& data_;
   }
 };
 
@@ -170,34 +167,28 @@ BOOST_CLASS_EXPORT(UnstampedVariable);
 class GenericConstraint : public fuse_core::Constraint
 {
 public:
-  FUSE_CONSTRAINT_DEFINITIONS(GenericConstraint);
+  FUSE_CONSTRAINT_DEFINITIONS(GenericConstraint)
 
   GenericConstraint() = default;
 
-  GenericConstraint(const std::string& source, std::initializer_list<fuse_core::UUID> variable_uuids) :
-    Constraint(source, variable_uuids)
+  GenericConstraint(std::string const& source, std::initializer_list<fuse_core::UUID> variable_uuids)
+    : Constraint(source, variable_uuids)
   {
   }
 
-  explicit GenericConstraint(const std::string& source, const fuse_core::UUID& variable1) :
-    fuse_core::Constraint(source, {variable1})
+  explicit GenericConstraint(std::string const& source, fuse_core::UUID const& variable1)
+    : fuse_core::Constraint(source, { variable1 })
   {
   }
 
-  GenericConstraint(
-    const std::string& source,
-    const fuse_core::UUID& variable1,
-    const fuse_core::UUID& variable2) :
-      fuse_core::Constraint(source, {variable1, variable2})
+  GenericConstraint(std::string const& source, fuse_core::UUID const& variable1, fuse_core::UUID const& variable2)
+    : fuse_core::Constraint(source, { variable1, variable2 })
   {
   }
 
-  GenericConstraint(
-    const std::string& source,
-    const fuse_core::UUID& variable1,
-    const fuse_core::UUID& variable2,
-    const fuse_core::UUID& variable3) :
-      fuse_core::Constraint(source, {variable1, variable2, variable3})
+  GenericConstraint(std::string const& source, fuse_core::UUID const& variable1, fuse_core::UUID const& variable2,
+                    fuse_core::UUID const& variable3)
+    : fuse_core::Constraint(source, { variable1, variable2, variable3 })
   {
   }
 
@@ -215,20 +206,20 @@ private:
   friend class boost::serialization::access;
 
   /**
-   * @brief The Boost Serialize method that serializes all of the data members in to/out of the archive
+   * @brief The Boost Serialize method that serializes all of the data members in to/out of the
+   *        archive
    *
    * @param[in/out] archive - The archive object that holds the serialized class members
    * @param[in] version - The version of the archive being read/written. Generally unused.
    */
-  template<class Archive>
-  void serialize(Archive& archive, const unsigned int /* version */)
+  template <class Archive>
+  void serialize(Archive& archive, unsigned int const /* version */)
   {
-    archive & boost::serialization::base_object<fuse_core::Constraint>(*this);
+    archive& boost::serialization::base_object<fuse_core::Constraint>(*this);
   }
 };
 
 BOOST_CLASS_EXPORT(GenericConstraint);
-
 
 TEST(VariableStampIndex, Size)
 {
@@ -261,7 +252,7 @@ TEST(VariableStampIndex, CurrentStamp)
   auto index = fuse_optimizers::VariableStampIndex();
 
   // Verify the current stamp is 0
-  EXPECT_EQ(ros::Time(0, 0), index.currentStamp());
+  EXPECT_EQ(rclcpp::Time(0, 0, RCL_ROS_TIME), index.currentStamp());
 
   // Add an unstamped variable
   auto x1 = UnstampedVariable::make_shared();
@@ -270,16 +261,16 @@ TEST(VariableStampIndex, CurrentStamp)
   index.addNewTransaction(transaction1);
 
   // Verify the current stamp is still 0
-  EXPECT_EQ(ros::Time(0, 0), index.currentStamp());
+  EXPECT_EQ(rclcpp::Time(0, 0, RCL_ROS_TIME), index.currentStamp());
 
   // Add a stamped variable
-  auto x2 = StampedVariable::make_shared(ros::Time(1, 0));
+  auto x2 = StampedVariable::make_shared(rclcpp::Time(1, 0, RCL_ROS_TIME));
   auto transaction2 = fuse_core::Transaction();
   transaction2.addVariable(x2);
   index.addNewTransaction(transaction2);
 
   // Verify the current stamp is now Time(1, 0)
-  EXPECT_EQ(ros::Time(1, 0), index.currentStamp());
+  EXPECT_EQ(rclcpp::Time(1, 0, RCL_ROS_TIME), index.currentStamp());
 }
 
 TEST(VariableStampIndex, Query)
@@ -288,9 +279,9 @@ TEST(VariableStampIndex, Query)
   auto index = fuse_optimizers::VariableStampIndex();
 
   // Add some variables and constraints
-  auto x1 = StampedVariable::make_shared(ros::Time(1, 0));
-  auto x2 = StampedVariable::make_shared(ros::Time(2, 0));
-  auto x3 = StampedVariable::make_shared(ros::Time(3, 0));
+  auto x1 = StampedVariable::make_shared(rclcpp::Time(1, 0, RCL_ROS_TIME));
+  auto x2 = StampedVariable::make_shared(rclcpp::Time(2, 0, RCL_ROS_TIME));
+  auto x3 = StampedVariable::make_shared(rclcpp::Time(3, 0, RCL_ROS_TIME));
   auto l1 = UnstampedVariable::make_shared();
   auto l2 = UnstampedVariable::make_shared();
 
@@ -315,13 +306,13 @@ TEST(VariableStampIndex, Query)
 
   auto expected1 = std::vector<fuse_core::UUID>{};
   auto actual1 = std::vector<fuse_core::UUID>();
-  index.query(ros::Time(1, 500000), std::back_inserter(actual1));
+  index.query(rclcpp::Time(1, 500000, RCL_ROS_TIME), std::back_inserter(actual1));
   EXPECT_EQ(expected1, actual1);
 
-  auto expected2 = std::vector<fuse_core::UUID>{x1->uuid(), l1->uuid()};
+  auto expected2 = std::vector<fuse_core::UUID>{ x1->uuid(), l1->uuid() };
   std::sort(expected2.begin(), expected2.end());
   auto actual2 = std::vector<fuse_core::UUID>();
-  index.query(ros::Time(2, 500000), std::back_inserter(actual2));
+  index.query(rclcpp::Time(2, 500000, RCL_ROS_TIME), std::back_inserter(actual2));
   std::sort(actual2.begin(), actual2.end());
   EXPECT_EQ(expected2, actual2);
 }
@@ -332,9 +323,9 @@ TEST(VariableStampIndex, MarginalTransaction)
   auto index = fuse_optimizers::VariableStampIndex();
 
   // Add some variables and constraints
-  auto x1 = StampedVariable::make_shared(ros::Time(1, 0));
-  auto x2 = StampedVariable::make_shared(ros::Time(2, 0));
-  auto x3 = StampedVariable::make_shared(ros::Time(3, 0));
+  auto x1 = StampedVariable::make_shared(rclcpp::Time(1, 0, RCL_ROS_TIME));
+  auto x2 = StampedVariable::make_shared(rclcpp::Time(2, 0, RCL_ROS_TIME));
+  auto x3 = StampedVariable::make_shared(rclcpp::Time(3, 0, RCL_ROS_TIME));
   auto l1 = UnstampedVariable::make_shared();
   auto l2 = UnstampedVariable::make_shared();
 
@@ -357,8 +348,8 @@ TEST(VariableStampIndex, MarginalTransaction)
   transaction.addConstraint(c5);
   index.addNewTransaction(transaction);
 
-  // Now create a fake marginal transaction. The constraint connections should *not* change the unstamped variable
-  // timestamps
+  // Now create a fake marginal transaction. The constraint connections should *not* change the
+  // unstamped variable timestamps
   auto marginal = fuse_core::Transaction();
   marginal.removeVariable(x1->uuid());
   marginal.removeConstraint(c1->uuid());
@@ -371,16 +362,10 @@ TEST(VariableStampIndex, MarginalTransaction)
   EXPECT_EQ(4u, index.size());
 
   // And the marginal constraint x3->l1 should not affect future queries
-  auto expected = std::vector<fuse_core::UUID>{l1->uuid()};
+  auto expected = std::vector<fuse_core::UUID>{ l1->uuid() };
   std::sort(expected.begin(), expected.end());
   auto actual = std::vector<fuse_core::UUID>();
-  index.query(ros::Time(2, 500000), std::back_inserter(actual));
+  index.query(rclcpp::Time(2, 500000, RCL_ROS_TIME), std::back_inserter(actual));
   std::sort(actual.begin(), actual.end());
   EXPECT_EQ(expected, actual);
-}
-
-int main(int argc, char **argv)
-{
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

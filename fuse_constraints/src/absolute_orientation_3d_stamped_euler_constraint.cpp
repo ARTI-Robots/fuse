@@ -31,32 +31,28 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_constraints/absolute_orientation_3d_stamped_euler_constraint.h>
-
-#include <fuse_constraints/normal_prior_orientation_3d_euler_cost_functor.h>
-#include <pluginlib/class_list_macros.h>
-
-#include <boost/serialization/export.hpp>
 #include <ceres/autodiff_cost_function.h>
 #include <Eigen/Dense>
 
 #include <string>
 #include <vector>
 
+#include <boost/serialization/export.hpp>
+#include <fuse_constraints/absolute_orientation_3d_stamped_euler_constraint.hpp>
+#include <fuse_constraints/normal_prior_orientation_3d_euler_cost_functor.hpp>
+#include <pluginlib/class_list_macros.hpp>
 
 namespace fuse_constraints
 {
 
 AbsoluteOrientation3DStampedEulerConstraint::AbsoluteOrientation3DStampedEulerConstraint(
-  const std::string& source,
-  const fuse_variables::Orientation3DStamped& orientation,
-  const fuse_core::VectorXd& mean,
-  const fuse_core::MatrixXd& covariance,
-  const std::vector<Euler> &axes) :
-    fuse_core::Constraint(source, {orientation.uuid()}),  // NOLINT(whitespace/braces)
-    mean_(mean),
-    sqrt_information_(covariance.inverse().llt().matrixU()),
-    axes_(axes)
+    std::string const& source, fuse_variables::Orientation3DStamped const& orientation, fuse_core::VectorXd const& mean,
+    fuse_core::MatrixXd const& covariance, std::vector<Euler> const& axes)
+  : fuse_core::Constraint(source, { orientation.uuid() })
+  ,  // NOLINT(whitespace/braces)
+  mean_(mean)
+  , sqrt_information_(covariance.inverse().llt().matrixU())
+  , axes_(axes)
 {
   assert(covariance.rows() == static_cast<int>(axes.size()));
   assert(covariance.cols() == static_cast<int>(axes.size()));
@@ -87,7 +83,7 @@ void AbsoluteOrientation3DStampedEulerConstraint::print(std::ostream& stream) co
 ceres::CostFunction* AbsoluteOrientation3DStampedEulerConstraint::costFunction() const
 {
   return new ceres::AutoDiffCostFunction<NormalPriorOrientation3DEulerCostFunctor, ceres::DYNAMIC, 4>(
-    new NormalPriorOrientation3DEulerCostFunctor(sqrt_information_, mean_, axes_), axes_.size());
+      new NormalPriorOrientation3DEulerCostFunctor(sqrt_information_, mean_, axes_), axes_.size());
 }
 
 }  // namespace fuse_constraints

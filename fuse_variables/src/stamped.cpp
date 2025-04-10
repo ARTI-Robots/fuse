@@ -31,34 +31,34 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_variables/stamped.h>
-
-#include <fuse_core/uuid.h>
-#include <ros/node_handle.h>
-
 #include <string>
 
+#include <fuse_core/node_interfaces/node_interfaces.hpp>
+#include <fuse_core/parameter.hpp>
+#include <fuse_core/uuid.hpp>
+#include <fuse_variables/stamped.hpp>
 
 namespace fuse_variables
 {
 
-fuse_core::UUID loadDeviceId(const ros::NodeHandle& node_handle)
+fuse_core::UUID
+loadDeviceId(fuse_core::node_interfaces::NodeInterfaces<fuse_core::node_interfaces::Parameters> interfaces)
 {
-  fuse_core::UUID device_id;
   std::string device_str;
-  if (node_handle.getParam("device_id", device_str))
+
+  device_str = fuse_core::getParam(interfaces, "device_id", std::string());
+  if (!device_str.empty())
   {
-    device_id = fuse_core::uuid::from_string(device_str);
+    return fuse_core::uuid::from_string(device_str);
   }
-  else if (node_handle.getParam("device_name", device_str))
+
+  device_str = fuse_core::getParam(interfaces, "device_name", std::string());
+  if (!device_str.empty())
   {
-    device_id = fuse_core::uuid::generate(device_str);
+    return fuse_core::uuid::generate(device_str);
   }
-  else
-  {
-    device_id = fuse_core::uuid::NIL;
-  }
-  return device_id;
+
+  return fuse_core::uuid::NIL;
 }
 
 }  // namespace fuse_variables

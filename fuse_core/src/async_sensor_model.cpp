@@ -31,52 +31,88 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_core/async_sensor_model.h>
-
-#include <fuse_core/callback_wrapper.h>
-#include <fuse_core/graph.h>
-#include <fuse_core/transaction.h>
-#include <ros/callback_queue.h>
-
-#include <boost/make_shared.hpp>
-
 #include <functional>
-#include <utility>
+#include <memory>
 #include <string>
+#include <utility>
 
+#include <fuse_core/async_sensor_model.hpp>
+#include <fuse_core/callback_wrapper.hpp>
+#include <fuse_core/graph.hpp>
+#include <fuse_core/transaction.hpp>
+#include <rclcpp/contexts/default_context.hpp>
 
 namespace fuse_core
 {
 
-AsyncSensorModel::AsyncSensorModel(size_t thread_count) :
-  name_("uninitialized"),
-  spinner_(thread_count, &callback_queue_)
+AsyncSensorModel::AsyncSensorModel(size_t thread_count) : name_("uninitialized"), executor_thread_count_(thread_count)
 {
 }
 
-void AsyncSensorModel::graphCallback(Graph::ConstSharedPtr graph)
+AsyncSensorModel::~AsyncSensorModel()
 {
-  callback_queue_.addCallback(
-    boost::make_shared<CallbackWrapper<void>>(std::bind(&AsyncSensorModel::onGraphUpdate, this, std::move(graph))),
-    reinterpret_cast<uint64_t>(this));
+  internalStop();
 }
 
-void AsyncSensorModel::initialize(
-  const std::string& name,
-  TransactionCallback transaction_callback)
+void AsyncSensorModel::initialize(node_interfaces::NodeInterfaces<ALL_FUSE_CORE_NODE_INTERFACES> interfaces,
+                                  std::string const& name, TransactionCallback transaction_callback)
 {
+  if (initialized_)
+  {
+    throw std::runtime_error("Calling initialize on an already initialized AsyncSensorModel!");
+  }
+
   // Initialize internal state
   name_ = name;
-  node_handle_.setCallbackQueue(&callback_queue_);
-  private_node_handle_ = ros::NodeHandle("~/" + name_);
-  private_node_handle_.setCallbackQueue(&callback_queue_);
+  interfaces_ = interfaces;
+
+  auto context = interfaces_.get_node_base_interface()->get_context();
+  auto executor_options = rclcpp::ExecutorOptions();
+  executor_options.context = context;
+
+  if (executor_thread_count_ == 1)
+  {
+    executor_ = rclcpp::executors::SingleThreadedExecutor::make_shared(executor_options);
+  }
+  else
+  {
+    executor_ = rclcpp::executors::MultiThreadedExecutor::make_shared(executor_options, executor_thread_count_);
+  }
+
+  callback_queue_ = std::make_shared<CallbackAdapter>(context);
+
+  // This callback group MUST be re-entrant in order to support parallelization
+  cb_group_ = interfaces_.get_node_base_interface()->create_callback_group(rclcpp::CallbackGroupType::Reentrant, false);
+  interfaces_.get_node_waitables_interface()->add_waitable(callback_queue_, cb_group_);
+
   transaction_callback_ = transaction_callback;
 
   // Call the derived onInit() function to perform implementation-specific initialization
   onInit();
 
-  // Start the async spinner to service the local callback queue
-  spinner_.start();
+  // Make sure the executor will service the given node
+  // We can add this without any guards because the callback group was set to not get automatically
+  // added to executors
+  executor_->add_callback_group(cb_group_, interfaces_.get_node_base_interface());
+
+  // Start the executor
+  spinner_ = std::thread([&]() { executor_->spin(); });
+
+  // Wait for the executor to start spinning.
+  // This avoids a race where the destructor blocks waiting for the spinner_
+  // thread to be joined when the class is destroyed before the thread is ever
+  // scheduled.
+  auto callback = std::make_shared<CallbackWrapper<void>>([&]() { initialized_ = true; });
+  auto result = callback->getFuture();
+  callback_queue_->addCallback(callback);
+  result.wait();
+}
+
+void AsyncSensorModel::graphCallback(Graph::ConstSharedPtr graph)
+{
+  auto callback =
+      std::make_shared<CallbackWrapper<void>>(std::bind(&AsyncSensorModel::onGraphUpdate, this, std::move(graph)));
+  callback_queue_->addCallback(callback);
 }
 
 void AsyncSensorModel::sendTransaction(Transaction::SharedPtr transaction)
@@ -86,26 +122,44 @@ void AsyncSensorModel::sendTransaction(Transaction::SharedPtr transaction)
 
 void AsyncSensorModel::start()
 {
-  auto callback = boost::make_shared<CallbackWrapper<void>>(std::bind(&AsyncSensorModel::onStart, this));
+  auto callback = std::make_shared<CallbackWrapper<void>>(std::bind(&AsyncSensorModel::onStart, this));
   auto result = callback->getFuture();
-  callback_queue_.addCallback(callback, reinterpret_cast<uint64_t>(this));
+  callback_queue_->addCallback(callback);
   result.wait();
 }
 
 void AsyncSensorModel::stop()
 {
-  if (ros::ok())
+  // Prefer to call onStop in executor's thread so downstream users don't have
+  // to worry about threads in ROS callbacks when there's only 1 thread.
+  if (interfaces_.get_node_base_interface()->get_context()->is_valid())
   {
-    auto callback = boost::make_shared<CallbackWrapper<void>>(std::bind(&AsyncSensorModel::onStop, this));
+    auto callback = std::make_shared<CallbackWrapper<void>>(std::bind(&AsyncSensorModel::onStop, this));
     auto result = callback->getFuture();
-    callback_queue_.addCallback(callback, reinterpret_cast<uint64_t>(this));
+    callback_queue_->addCallback(callback);
     result.wait();
   }
   else
   {
-    spinner_.stop();
+    // Can't run in executor's thread because the executor won't service more
+    // callbacks after the context is shutdown.
+    // Join executor's threads right away.
+    internalStop();
     onStop();
   }
+}
+
+void AsyncSensorModel::internalStop()
+{
+  if (spinner_.joinable())
+  {
+    executor_->cancel();
+    spinner_.join();
+  }
+
+  // Reset callback queue
+  callback_queue_->removeAllCallbacks();
+  initialized_ = false;
 }
 
 }  // namespace fuse_core

@@ -1,52 +1,61 @@
 /*
+ * Software License Agreement (BSD License)
+ *
  * Copyright (c) 2017, Ellon Paiva Mendes @ LAAS-CNRS
  * All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions
+ *  are met:
  *
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of the Willow Garage, Inc. nor the names of its
- *       contributors may be used to endorse or promote products derived from
- *       this software without specific prior written permission.
+ *   * Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above
+ *     copyright notice, this list of conditions and the following
+ *     disclaimer in the documentation and/or other materials provided
+ *     with the distribution.
+ *   * Neither the name of the copyright holder nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+ *  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
+ *  COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
+ *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
+ *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+ *  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
+ *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ *  POSSIBILITY OF SUCH DAMAGE.
  */
-
-#include <fuse_viz/mapped_covariance_property.h>
-#include <fuse_viz/mapped_covariance_visual.h>
-
-#include <rviz/properties/color_property.h>
-#include <rviz/properties/enum_property.h>
-#include <rviz/properties/float_property.h>
-
-#include <QColor>
 
 #include <OgreSceneManager.h>
 #include <OgreSceneNode.h>
+#include <QColor>
 
 #include <string>
 
-namespace rviz
+#include <fuse_viz/mapped_covariance_property.hpp>
+#include <fuse_viz/mapped_covariance_visual.hpp>
+#include <rviz_common/properties/color_property.hpp>
+#include <rviz_common/properties/enum_property.hpp>
+#include <rviz_common/properties/float_property.hpp>
+
+namespace fuse_viz
 {
 
-MappedCovarianceProperty::MappedCovarianceProperty(const QString& name, bool default_value, const QString& description,
-                                                   Property* parent, const char* changed_slot, QObject* receiver)
-  // NOTE: changed_slot and receiver aren't passed to BoolProperty here, but initialized at the end of this constructor
+using rviz_common::properties::BoolProperty;
+using rviz_common::properties::ColorProperty;
+using rviz_common::properties::EnumProperty;
+using rviz_common::properties::FloatProperty;
+
+MappedCovarianceProperty::MappedCovarianceProperty(QString const& name, bool default_value, QString const& description,
+                                                   Property* parent, char const* changed_slot, QObject* receiver)
+  // NOTE: changed_slot and receiver aren't passed to BoolProperty here, but initialized at the end of
+  // this constructor
   : BoolProperty(name, default_value, description, parent)
 {
   position_property_ = new BoolProperty("Position", true, "Whether or not to show the position part of covariances",
@@ -117,9 +126,13 @@ MappedCovarianceProperty::MappedCovarianceProperty(const QString& name, bool def
   if (changed_slot && (parent || receiver))
   {
     if (receiver)
+    {
       connect(this, SIGNAL(changed()), receiver, changed_slot);
+    }
     else
+    {
       connect(this, SIGNAL(changed()), parent, changed_slot);
+    }
   }
 
   setDisableChildrenIfFalse(true);
@@ -138,13 +151,13 @@ void MappedCovarianceProperty::updateColorStyleChoice()
 
 void MappedCovarianceProperty::updateColorAndAlphaAndScaleAndOffset()
 {
-  for (const auto& entry : covariances_)
+  for (auto const& entry : covariances_)
   {
     updateColorAndAlphaAndScaleAndOffset(entry.second);
   }
 }
 
-void MappedCovarianceProperty::updateColorAndAlphaAndScaleAndOffset(const MappedCovarianceVisualPtr& visual)
+void MappedCovarianceProperty::updateColorAndAlphaAndScaleAndOffset(MappedCovarianceVisualPtr const& visual)
 {
   float pos_alpha = position_alpha_property_->getFloat();
   float pos_scale = position_scale_property_->getFloat();
@@ -170,13 +183,13 @@ void MappedCovarianceProperty::updateColorAndAlphaAndScaleAndOffset(const Mapped
 
 void MappedCovarianceProperty::updateVisibility()
 {
-  for (const auto& entry : covariances_)
+  for (auto const& entry : covariances_)
   {
     updateVisibility(entry.second);
   }
 }
 
-void MappedCovarianceProperty::updateVisibility(const MappedCovarianceVisualPtr& visual)
+void MappedCovarianceProperty::updateVisibility(MappedCovarianceVisualPtr const& visual)
 {
   bool show_covariance = getBool();
   if (!show_covariance)
@@ -194,19 +207,19 @@ void MappedCovarianceProperty::updateVisibility(const MappedCovarianceVisualPtr&
 
 void MappedCovarianceProperty::updateOrientationFrame()
 {
-  for (const auto& entry : covariances_)
+  for (auto const& entry : covariances_)
   {
     updateOrientationFrame(entry.second);
   }
 }
 
-void MappedCovarianceProperty::updateOrientationFrame(const MappedCovarianceVisualPtr& visual)
+void MappedCovarianceProperty::updateOrientationFrame(MappedCovarianceVisualPtr const& visual)
 {
   bool use_rotating_frame = (orientation_frame_property_->getOptionInt() == Local);
   visual->setRotatingFrame(use_rotating_frame);
 }
 
-void MappedCovarianceProperty::eraseVisual(const std::string& key)
+void MappedCovarianceProperty::eraseVisual(std::string const& key)
 {
   covariances_.erase(key);
 }
@@ -221,8 +234,9 @@ size_t MappedCovarianceProperty::sizeVisual()
   return covariances_.size();
 }
 
-MappedCovarianceProperty::MappedCovarianceVisualPtr MappedCovarianceProperty::createAndInsertVisual(
-    const std::string& key, Ogre::SceneManager* scene_manager, Ogre::SceneNode* parent_node)
+MappedCovarianceProperty::MappedCovarianceVisualPtr
+MappedCovarianceProperty::createAndInsertVisual(std::string const& key, Ogre::SceneManager* scene_manager,
+                                                Ogre::SceneNode* parent_node)
 {
   bool use_rotating_frame = (orientation_frame_property_->getOptionInt() == Local);
   MappedCovarianceVisualPtr visual(new MappedCovarianceVisual(scene_manager, parent_node, use_rotating_frame));
@@ -243,4 +257,4 @@ bool MappedCovarianceProperty::getOrientationBool()
   return orientation_property_->getBool();
 }
 
-}  // end namespace rviz
+}  // namespace fuse_viz

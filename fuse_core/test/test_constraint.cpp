@@ -31,20 +31,19 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_core/uuid.h>
-#include <test/example_constraint.h>
-
 #include <gtest/gtest.h>
 
 #include <vector>
 
+#include "example_constraint.hpp"
+#include <fuse_core/uuid.hpp>
 
 TEST(Constraint, Constructor)
 {
   // Create a constraint with a single UUID
   {
     fuse_core::UUID variable_uuid1 = fuse_core::uuid::generate();
-    ExampleConstraint constraint("test", {variable_uuid1});  // NOLINT
+    ExampleConstraint constraint("test", { variable_uuid1 });  // NOLINT
     ASSERT_EQ(1u, constraint.variables().size());
     ASSERT_EQ(variable_uuid1, constraint.variables().at(0));
   }
@@ -53,7 +52,7 @@ TEST(Constraint, Constructor)
     fuse_core::UUID variable_uuid1 = fuse_core::uuid::generate();
     fuse_core::UUID variable_uuid2 = fuse_core::uuid::generate();
     fuse_core::UUID variable_uuid3 = fuse_core::uuid::generate();
-    ExampleConstraint constraint("test", {variable_uuid1, variable_uuid2, variable_uuid3});  // NOLINT
+    ExampleConstraint constraint("test", { variable_uuid1, variable_uuid2, variable_uuid3 });  // NOLINT
     ASSERT_EQ(3u, constraint.variables().size());
     ASSERT_EQ(variable_uuid1, constraint.variables().at(0));
     ASSERT_EQ(variable_uuid2, constraint.variables().at(1));
@@ -78,7 +77,7 @@ TEST(Constraint, Constructor)
     fuse_core::UUID variable_uuid1 = fuse_core::uuid::generate();
     fuse_core::UUID variable_uuid2 = fuse_core::uuid::generate();
     fuse_core::UUID variable_uuid3 = fuse_core::uuid::generate();
-    ExampleConstraint constraint1("test", {variable_uuid1, variable_uuid2, variable_uuid3});  // NOLINT
+    ExampleConstraint constraint1("test", { variable_uuid1, variable_uuid2, variable_uuid3 });  // NOLINT
     ExampleConstraint constraint2(constraint1);
 
     ASSERT_EQ(constraint1.uuid(), constraint2.uuid());
@@ -93,12 +92,6 @@ TEST(Constraint, Constructor)
 TEST(Constraint, Type)
 {
   fuse_core::UUID variable_uuid1 = fuse_core::uuid::generate();
-  ExampleConstraint constraint("test", {variable_uuid1});  // NOLINT
+  ExampleConstraint constraint("test", { variable_uuid1 });  // NOLINT
   ASSERT_EQ("ExampleConstraint", constraint.type());
-}
-
-int main(int argc, char **argv)
-{
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

@@ -31,41 +31,47 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_constraints/marginal_cost_function.h>
-
-#include <fuse_core/eigen.h>
-#include <fuse_core/local_parameterization.h>
-
 #include <Eigen/Core>
 
-#include <vector>
 #include <iostream>
+#include <vector>
 
+#include <fuse_constraints/marginal_cost_function.hpp>
+#include <fuse_core/ceres_macros.hpp>
+#include <fuse_core/eigen.hpp>
+#include <fuse_core/local_parameterization.hpp>
+#include <fuse_core/manifold.hpp>
 
 namespace fuse_constraints
 {
-
+#if !CERES_SUPPORTS_MANIFOLDS
 MarginalCostFunction::MarginalCostFunction(
-    const std::vector<fuse_core::MatrixXd>& A,
-    const fuse_core::VectorXd& b,
-    const std::vector<fuse_core::VectorXd>& x_bar,
-    const std::vector<fuse_core::LocalParameterization::SharedPtr>& local_parameterizations) :
-  A_(A),
-  b_(b),
-  local_parameterizations_(local_parameterizations),
-  x_bar_(x_bar)
+    std::vector<fuse_core::MatrixXd> const& A, fuse_core::VectorXd const& b,
+    std::vector<fuse_core::VectorXd> const& x_bar,
+    std::vector<fuse_core::LocalParameterization::SharedPtr> const& local_parameterizations)
+  : A_(A), b_(b), local_parameterizations_(local_parameterizations), x_bar_(x_bar)
 {
   set_num_residuals(b_.rows());
-  for (const auto& x_bar : x_bar_)
+  for (auto const& x_bar : x_bar_)
   {
     mutable_parameter_block_sizes()->push_back(x_bar.size());
   }
 }
+#else
+MarginalCostFunction::MarginalCostFunction(std::vector<fuse_core::MatrixXd> const& A, fuse_core::VectorXd const& b,
+                                           std::vector<fuse_core::VectorXd> const& x_bar,
+                                           std::vector<fuse_core::Manifold::SharedPtr> const& manifolds)
+  : A_(A), b_(b), manifolds_(manifolds), x_bar_(x_bar)
+{
+  set_num_residuals(b_.rows());
+  for (auto const& x_bar : x_bar_)
+  {
+    mutable_parameter_block_sizes()->push_back(x_bar.size());
+  }
+}
+#endif
 
-bool MarginalCostFunction::Evaluate(
-  double const* const* parameters,
-  double* residuals,
-  double** jacobians) const
+bool MarginalCostFunction::Evaluate(double const* const* parameters, double* residuals, double** jacobians) const
 {
   // Compute cost
   Eigen::Map<fuse_core::VectorXd> residuals_map(residuals, num_residuals());
@@ -73,9 +79,15 @@ bool MarginalCostFunction::Evaluate(
   for (size_t i = 0; i < A_.size(); ++i)
   {
     fuse_core::VectorXd delta(A_[i].cols());
+#if !CERES_SUPPORTS_MANIFOLDS
     if (local_parameterizations_[i])
     {
       local_parameterizations_[i]->Minus(x_bar_[i].data(), parameters[i], delta.data());
+#else
+    if (manifolds_[i])
+    {
+      manifolds_[i]->Minus(parameters[i], x_bar_[i].data(), delta.data());
+#endif
     }
     else
     {
@@ -94,11 +106,19 @@ bool MarginalCostFunction::Evaluate(
     {
       if (jacobians[i])
       {
+#if !CERES_SUPPORTS_MANIFOLDS
         if (local_parameterizations_[i])
         {
-          const auto& local_parameterization = local_parameterizations_[i];
+          auto const& local_parameterization = local_parameterizations_[i];
           fuse_core::MatrixXd J_local(local_parameterization->LocalSize(), local_parameterization->GlobalSize());
           local_parameterization->ComputeMinusJacobian(parameters[i], J_local.data());
+#else
+        if (manifolds_[i])
+        {
+          auto const& manifold = manifolds_[i];
+          fuse_core::MatrixXd J_local(manifold->TangentSize(), manifold->AmbientSize());
+          manifold->MinusJacobian(parameters[i], J_local.data());
+#endif
           Eigen::Map<fuse_core::MatrixXd>(jacobians[i], num_residuals(), parameter_block_sizes()[i]) = A_[i] * J_local;
         }
         else

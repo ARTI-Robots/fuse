@@ -31,27 +31,25 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_loss/arctan_loss.h>
-#include <fuse_loss/cauchy_loss.h>
-#include <fuse_loss/dcs_loss.h>
-#include <fuse_loss/fair_loss.h>
-#include <fuse_loss/geman_mcclure_loss.h>
-#include <fuse_loss/huber_loss.h>
-#include <fuse_loss/softlone_loss.h>
-#include <fuse_loss/tolerant_loss.h>
-#include <fuse_loss/trivial_loss.h>
-#include <fuse_loss/tukey_loss.h>
-#include <fuse_loss/welsch_loss.h>
-
-#include <fuse_loss/qwt_loss_plot.h>
-
 #include <gtest/gtest.h>
-
 #include <QApplication>
 
+#include <iostream>
 #include <memory>
 #include <vector>
 
+#include <fuse_loss/arctan_loss.hpp>
+#include <fuse_loss/cauchy_loss.hpp>
+#include <fuse_loss/dcs_loss.hpp>
+#include <fuse_loss/fair_loss.hpp>
+#include <fuse_loss/geman_mcclure_loss.hpp>
+#include <fuse_loss/huber_loss.hpp>
+#include <fuse_loss/qwt_loss_plot.hpp>
+#include <fuse_loss/softlone_loss.hpp>
+#include <fuse_loss/tolerant_loss.hpp>
+#include <fuse_loss/trivial_loss.hpp>
+#include <fuse_loss/tukey_loss.hpp>
+#include <fuse_loss/welsch_loss.hpp>
 
 class QwtLossPlotTest : public testing::Test
 {
@@ -59,9 +57,9 @@ public:
   QwtLossPlotTest()
   {
     // Generate samples:
-    const double step{ 0.01 };
+    double const step{ 0.01 };
     const size_t half_samples{ 1000 };
-    const double x_min = -(half_samples * step);
+    double const x_min = -(half_samples * step);
 
     const size_t samples{ 2 * half_samples + 1 };
 
@@ -79,19 +77,15 @@ public:
 TEST_F(QwtLossPlotTest, PlotLossQt)
 {
   // Create losses
-  std::vector<std::shared_ptr<fuse_core::Loss>> losses{ {  // NOLINT(whitespace/braces)
-    std::make_shared<fuse_loss::ArctanLoss>(),
-    std::make_shared<fuse_loss::CauchyLoss>(),
-    std::make_shared<fuse_loss::DCSLoss>(),
-    std::make_shared<fuse_loss::FairLoss>(),
-    std::make_shared<fuse_loss::GemanMcClureLoss>(),
-    std::make_shared<fuse_loss::HuberLoss>(),
-    std::make_shared<fuse_loss::SoftLOneLoss>(),
-    std::make_shared<fuse_loss::TolerantLoss>(),
-    std::make_shared<fuse_loss::TrivialLoss>(),
-    std::make_shared<fuse_loss::TukeyLoss>(),
-    std::make_shared<fuse_loss::WelschLoss>()
-  } };
+  std::vector<std::shared_ptr<fuse_core::Loss>> losses{
+    { // NOLINT(whitespace/braces)
+      std::make_shared<fuse_loss::ArctanLoss>(), std::make_shared<fuse_loss::CauchyLoss>(),
+      std::make_shared<fuse_loss::DCSLoss>(), std::make_shared<fuse_loss::FairLoss>(),
+      std::make_shared<fuse_loss::GemanMcClureLoss>(), std::make_shared<fuse_loss::HuberLoss>(),
+      std::make_shared<fuse_loss::SoftLOneLoss>(), std::make_shared<fuse_loss::TolerantLoss>(),
+      std::make_shared<fuse_loss::TrivialLoss>(), std::make_shared<fuse_loss::TukeyLoss>(),
+      std::make_shared<fuse_loss::WelschLoss>() }
+  };
 
   // Create a Qt application:
   int argc = 0;
@@ -112,7 +106,7 @@ TEST_F(QwtLossPlotTest, PlotLossQt)
   plot.setAxisScale(QwtPlot::yLeft, 0.0, 15.0);
 
   // Create a curve for each loss rho function:
-  for (const auto& loss : losses)
+  for (auto const& loss : losses)
   {
     rho_loss_plot.plotRho(loss);
   }
@@ -130,7 +124,7 @@ TEST_F(QwtLossPlotTest, PlotLossQt)
   influence_plot.setAxisScale(QwtPlot::yLeft, -3.0, 3.0);
 
   // Create a curve for each loss rho function:
-  for (const auto& loss : losses)
+  for (auto const& loss : losses)
   {
     influence_loss_plot.plotInfluence(loss);
   }
@@ -148,7 +142,7 @@ TEST_F(QwtLossPlotTest, PlotLossQt)
   weight_plot.setAxisScale(QwtPlot::yLeft, 0.0, 1.5);
 
   // Create a curve for each loss rho function:
-  for (const auto& loss : losses)
+  for (auto const& loss : losses)
   {
     weight_loss_plot.plotWeight(loss);
   }
@@ -166,7 +160,7 @@ TEST_F(QwtLossPlotTest, PlotLossQt)
   second_derivative_plot.setAxisScale(QwtPlot::yLeft, -0.15, 0.15);
 
   // Create a curve for each loss rho function:
-  for (const auto& loss : losses)
+  for (auto const& loss : losses)
   {
     second_derivative_loss_plot.plotSecondDerivative(loss);
   }
@@ -180,7 +174,8 @@ TEST_F(QwtLossPlotTest, PlotLossQt)
   second_derivative_plot.show();
 #endif
 
-  // Save as an SVG image, that can be converted to PNG with (e.g. for the weight function SVG image file):
+  // Save as an SVG image, that can be converted to PNG with (e.g. for the weight function SVG image
+  // file):
   //
   //   inkscape -z -e weight.png weight.svg
   //
@@ -194,12 +189,10 @@ TEST_F(QwtLossPlotTest, PlotLossQt)
 
 #ifdef INTERACTIVE_TESTS
   // Run application:
+  // NOTE(CH3): This will block indefinitely until the test windows are closed! Since the tests are
+  //            meant to be interactive you MUST close the windows for them to pass!!
+  std::cout << "Interactive test active. If test does a timeout, and you did not manually close the"
+            << "windows that popped up, the timeout is expected!" << std::endl;
   app.exec();
 #endif
-}
-
-int main(int argc, char** argv)
-{
-  testing::InitGoogleTest(&argc, argv);
-  return RUN_ALL_TESTS();
 }

@@ -31,16 +31,17 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_graphs/hash_graph.h>
-#include <fuse_optimizers/batch_optimizer.h>
-#include <ros/ros.h>
 
+#include <fuse_graphs/hash_graph.hpp>
+#include <fuse_optimizers/batch_optimizer.hpp>
 
-int main(int argc, char **argv)
+int main(int argc, char** argv)
 {
-  ros::init(argc, argv, "batch_optimizer_node");
-  fuse_optimizers::BatchOptimizer optimizer(fuse_graphs::HashGraph::make_unique());
-  ros::spin();
+  rclcpp::init(argc, argv);
+  auto node = std::make_shared<rclcpp::Node>("batch_optimizer_node");
+  auto optimizer = std::make_shared<fuse_optimizers::BatchOptimizer>(*node);
 
+  rclcpp::spin(node);
+  rclcpp::shutdown();
   return 0;
 }

@@ -31,29 +31,28 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  */
-#include <fuse_loss/softlone_loss.h>
-
-#include <pluginlib/class_list_macros.h>
-#include <ros/node_handle.h>
-
-#include <boost/serialization/export.hpp>
-
 #include <ostream>
 #include <string>
 
+#include <boost/serialization/export.hpp>
+#include <fuse_core/parameter.hpp>
+#include <fuse_loss/softlone_loss.hpp>
+#include <pluginlib/class_list_macros.hpp>
 
 namespace fuse_loss
 {
 
-SoftLOneLoss::SoftLOneLoss(const double a) : a_(a)
+SoftLOneLoss::SoftLOneLoss(double const a) : a_(a)
 {
 }
 
-void SoftLOneLoss::initialize(const std::string& name)
+void SoftLOneLoss::initialize(
+    fuse_core::node_interfaces::NodeInterfaces<fuse_core::node_interfaces::Base, fuse_core::node_interfaces::Logging,
+                                               fuse_core::node_interfaces::Parameters>
+        interfaces,
+    std::string const& name)
 {
-  ros::NodeHandle private_node_handle(name);
-
-  private_node_handle.param("a", a_, a_);
+  a_ = fuse_core::getParam(interfaces, name + ".a", a_);
 }
 
 void SoftLOneLoss::print(std::ostream& stream) const
