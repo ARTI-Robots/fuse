@@ -246,18 +246,25 @@ void Odometry2DPublisher::onStart()
   latest_covariance_valid_ = false;
   odom_output_ = nav_msgs::msg::Odometry();
   acceleration_output_ = geometry_msgs::msg::AccelWithCovarianceStamped();
-
-  // TODO(CH3): Add this to a separate callback group for async behavior
-  publish_timer_ =
-      rclcpp::create_timer(interfaces_, clock_, std::chrono::duration<double>(1.0 / params_.publish_frequency),
-                           std::move(std::bind(&Odometry2DPublisher::publishTimerCallback, this)), cb_group_);
-
+  should_publish_zero_ = false;
+  if (!publish_timer_ || publish_timer_->is_canceled()) {
+    // TODO(CH3): Add this to a separate callback group for async behavior
+    publish_timer_ =
+            rclcpp::create_timer(interfaces_, clock_,
+                                     std::chrono::duration<double>(1.0 / params_.publish_frequency),
+                                     std::move(std::bind(&Odometry2DPublisher::publishTimerCallback, this)), cb_group_);
+  }
   delayed_throttle_filter_.reset();
 }
 
 void Odometry2DPublisher::onStop()
 {
-  publish_timer_->cancel();
+    if (!params_.publish_zero_when_stopped) {
+        publish_timer_->cancel();
+    }
+    else {
+        should_publish_zero_ = true;
+    }
 }
 
 bool Odometry2DPublisher::getState(fuse_core::Graph const& graph, rclcpp::Time const& stamp,
@@ -324,6 +331,26 @@ bool Odometry2DPublisher::getState(fuse_core::Graph const& graph, rclcpp::Time c
 
 void Odometry2DPublisher::publishTimerCallback()
 {
+    if (should_publish_zero_ && params_.publish_tf)
+    {
+        auto frame_id = params_.world_frame_id;
+        auto child_frame_id = params_.base_link_output_frame_id;
+
+        if (params_.invert_tf)
+        {
+            std::swap(frame_id, child_frame_id);
+        }
+
+        geometry_msgs::msg::TransformStamped trans;
+        trans.header.stamp = interfaces_.get_node_clock_interface()->get_clock()->now();
+        trans.header.frame_id = frame_id;
+        trans.child_frame_id = child_frame_id;
+        trans.transform.rotation.w = 1.0;
+
+        tf_broadcaster_->sendTransform(trans);
+        return;
+    }
+
   rclcpp::Time latest_stamp;
   rclcpp::Time latest_covariance_stamp;
   bool latest_covariance_valid;

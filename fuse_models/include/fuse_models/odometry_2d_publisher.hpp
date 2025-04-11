@@ -227,6 +227,7 @@ protected:
                                                                       //!< on start
 
   rclcpp::TimerBase::SharedPtr publish_timer_;
+  bool should_publish_zero_ { false };  //!< Should publish a zero transformation
 
   std::mutex mutex_;  //!< A mutex to protect the access to the attributes used concurrently by the
                       //!< notifyCallback and publishTimerCallback methods:

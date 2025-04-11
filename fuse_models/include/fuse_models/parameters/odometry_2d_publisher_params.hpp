@@ -81,6 +81,8 @@ public:
         interfaces, fuse_core::joinParameterName(ns, "predict_to_current_time"), predict_to_current_time);
     predict_with_acceleration = fuse_core::getParam(
         interfaces, fuse_core::joinParameterName(ns, "predict_with_acceleration"), predict_with_acceleration);
+    publish_zero_when_stopped = fuse_core::getParam(
+        interfaces, fuse_core::joinParameterName(ns, "publish_zero_when_stopped"), publish_zero_when_stopped);
     publish_frequency =
         fuse_core::getParam(interfaces, fuse_core::joinParameterName(ns, "publish_frequency"), publish_frequency);
 
@@ -141,6 +143,8 @@ public:
                             //!< the child_frame_id to the world_frame_id
   bool predict_to_current_time{ false };
   bool predict_with_acceleration{ false };
+  bool publish_zero_when_stopped{ false };  //!< Whether to publish a zero transformation after activating once and
+                                            //!< deactivating afterwards
   double publish_frequency{ 10.0 };
   fuse_core::Matrix8d process_noise_covariance;  //!< Process noise covariance matrix
   bool scale_process_noise{ false };
