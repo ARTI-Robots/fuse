@@ -121,6 +121,10 @@ public:
   BatchOptimizer& operator=(BatchOptimizer const&) = delete;
   BatchOptimizer& operator=(BatchOptimizer&&) = delete;
 
+  bool configure() override;
+  bool activate() override;
+  bool deactivate() override;
+
 protected:
   /**
    * Structure containing the information required to process a transaction after it was received.

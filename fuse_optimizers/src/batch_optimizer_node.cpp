@@ -34,14 +34,16 @@
 
 #include <fuse_graphs/hash_graph.hpp>
 #include <fuse_optimizers/batch_optimizer.hpp>
+#include <fuse_optimizers/optimizer_node.h>
 
 int main(int argc, char** argv)
 {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<rclcpp::Node>("batch_optimizer_node");
+  auto node = std::make_shared<fuse_optimizers::OptimizerNode>("batch_optimizer_node");
   auto optimizer = std::make_shared<fuse_optimizers::BatchOptimizer>(*node);
+  node->setOptimizer(optimizer);
 
-  rclcpp::spin(node);
+  rclcpp::spin(node->get_node_base_interface());
   rclcpp::shutdown();
   return 0;
 }

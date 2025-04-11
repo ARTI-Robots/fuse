@@ -115,6 +115,10 @@ public:
   Optimizer& operator=(Optimizer&&) = delete;
   Optimizer& operator=(Optimizer const&) = delete;
 
+  virtual bool configure();
+  virtual bool activate();
+  virtual bool deactivate();
+
 protected:
   // The unique ptrs returned by pluginlib have a custom deleter. This makes specifying the type
   // rather annoying as it is not equivalent to Class::UniquePtr
@@ -263,6 +267,8 @@ protected:
    * @param[in] status The diagnostic status
    */
   virtual void setDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& status);
+
+  bool plugins_stopped_;  //!< flag to indicate if the plugins where already stopped
 };
 
 }  // namespace fuse_optimizers

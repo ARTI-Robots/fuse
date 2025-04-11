@@ -63,6 +63,7 @@ Optimizer::Optimizer(fuse_core::node_interfaces::NodeInterfaces<ALL_FUSE_CORE_NO
                         interfaces.get_node_logging_interface(), interfaces.get_node_parameters_interface(),
                         interfaces.get_node_timers_interface(), interfaces.get_node_topics_interface())
   , callback_queue_(std::make_shared<fuse_core::CallbackAdapter>(interfaces_.get_node_base_interface()->get_context()))
+  , plugins_stopped_(true)
 {
   if (!graph)
   {
@@ -77,17 +78,6 @@ Optimizer::Optimizer(fuse_core::node_interfaces::NodeInterfaces<ALL_FUSE_CORE_NO
 
   diagnostic_updater_.add(interfaces_.get_node_base_interface()->get_namespace(), this, &Optimizer::setDiagnostics);
   diagnostic_updater_.setHardwareID("fuse");
-
-  // Wait for a valid time before loading any of the plugins
-  clock_->wait_until_started();
-
-  // Load all configured plugins
-  loadMotionModels();
-  loadSensorModels();
-  loadPublishers();
-
-  // Start all the plugins
-  startPlugins();
 }
 
 // the classloader destructor makes clang-tidy complain...
@@ -99,6 +89,35 @@ Optimizer::~Optimizer()
   stopPlugins();
 }
 // NOLINTEND(clang-analyzer-optin.cplusplus.VirtualCall)
+
+bool Optimizer::configure()
+{
+  // Wait for a valid time before loading any of the plugins
+  clock_->wait_until_started();
+
+  // Load all configured plugins
+  loadMotionModels();
+  loadSensorModels();
+  loadPublishers();
+
+  return true;
+}
+
+bool Optimizer::activate()
+{
+  // Start all the plugins
+  startPlugins();
+
+  return true;
+}
+
+bool Optimizer::deactivate()
+{
+  // Stop all the plugins
+  stopPlugins();
+
+  return true;
+}
 
 void Optimizer::loadMotionModels()
 {
@@ -440,6 +459,8 @@ void Optimizer::clearCallbacks()
 
 void Optimizer::startPlugins()
 {
+  plugins_stopped_ = false;
+
   for (auto const& name_plugin : motion_models_)
   {
     name_plugin.second->start();
@@ -458,6 +479,11 @@ void Optimizer::startPlugins()
 
 void Optimizer::stopPlugins()
 {
+  if (plugins_stopped_)
+  {
+    return;
+  }
+
   for (auto const& name_plugin : publishers_)
   {
     name_plugin.second->stop();
@@ -472,6 +498,8 @@ void Optimizer::stopPlugins()
   }
 
   diagnostic_updater_.force_update();
+
+  plugins_stopped_ = true;
 }
 
 void Optimizer::setDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& status)

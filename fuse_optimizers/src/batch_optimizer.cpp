@@ -54,14 +54,6 @@ BatchOptimizer::BatchOptimizer(fuse_core::node_interfaces::NodeInterfaces<ALL_FU
   , started_(false)
 {
   params_.loadFromROS(interfaces_);
-
-  // Configure a timer to trigger optimizations
-  optimize_timer_ = rclcpp::create_timer(interfaces_, clock_, params_.optimization_period,
-                                         std::bind(&BatchOptimizer::optimizerTimerCallback, this),
-                                         interfaces_.get_node_base_interface()->get_default_callback_group());
-
-  // Start the optimization thread
-  optimization_thread_ = std::thread(&BatchOptimizer::optimizationLoop, this);
 }
 
 BatchOptimizer::~BatchOptimizer()
@@ -73,6 +65,52 @@ BatchOptimizer::~BatchOptimizer()
   {
     optimization_thread_.join();
   }
+}
+
+bool BatchOptimizer::configure()
+{
+  bool result = Optimizer::configure();
+
+  if (result)
+  {
+    // Configure a timer to trigger optimizations
+    optimize_timer_ = rclcpp::create_timer(interfaces_, clock_, params_.optimization_period,
+                                           std::bind(&BatchOptimizer::optimizerTimerCallback, this),
+                                           interfaces_.get_node_base_interface()->get_default_callback_group());
+  }
+
+  return result;
+}
+
+bool BatchOptimizer::activate()
+{
+  bool result = Optimizer::activate();
+
+  if (result)
+  {
+    // Start the optimization thread
+    optimization_thread_ = std::thread(&BatchOptimizer::optimizationLoop, this);
+  }
+
+  return result;
+}
+
+bool BatchOptimizer::deactivate()
+{
+  bool result = Optimizer::deactivate();
+
+  if (result)
+  {
+    // Wake up any sleeping threads
+    optimization_requested_.notify_all();
+    // Wait for the threads to shutdown
+    if (optimization_thread_.joinable())
+    {
+      optimization_thread_.join();
+    }
+  }
+
+  return result;
 }
 
 void BatchOptimizer::applyMotionModelsToQueue()

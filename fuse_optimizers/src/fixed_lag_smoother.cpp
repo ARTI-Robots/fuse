@@ -86,24 +86,6 @@ FixedLagSmoother::FixedLagSmoother(fuse_core::node_interfaces::NodeInterfaces<AL
   , optimization_request_(false)
 {
   params_.loadFromROS(interfaces_);
-
-  // Test for auto-start
-  autostart();
-
-  // Start the optimization thread
-  optimization_thread_ = std::thread(&FixedLagSmoother::optimizationLoop, this);
-
-  // Configure a timer to trigger optimizations
-  optimize_timer_ = rclcpp::create_timer(interfaces_, clock_, params_.optimization_period,
-                                         std::bind(&FixedLagSmoother::optimizerTimerCallback, this),
-                                         interfaces_.get_node_base_interface()->get_default_callback_group());
-
-  // Advertise a service that resets the optimizer to its initial state
-  reset_service_server_ = rclcpp::create_service<std_srvs::srv::Empty>(
-      interfaces_.get_node_base_interface(), interfaces_.get_node_services_interface(),
-      fuse_core::joinTopicName(interfaces_.get_node_base_interface()->get_name(), params_.reset_service),
-      std::bind(&FixedLagSmoother::resetServiceCallback, this, std::placeholders::_1, std::placeholders::_2),
-      rclcpp::ServicesQoS().get_rmw_qos_profile(), interfaces_.get_node_base_interface()->get_default_callback_group());
 }
 
 FixedLagSmoother::~FixedLagSmoother()
@@ -116,6 +98,63 @@ FixedLagSmoother::~FixedLagSmoother()
   {
     optimization_thread_.join();
   }
+}
+
+bool FixedLagSmoother::configure()
+{
+  bool result = Optimizer::configure();
+
+  if (result)
+  {
+    // Configure a timer to trigger optimizations
+    optimize_timer_ = rclcpp::create_timer(interfaces_, clock_, params_.optimization_period,
+                                           std::bind(&FixedLagSmoother::optimizerTimerCallback, this),
+                                           interfaces_.get_node_base_interface()->get_default_callback_group());
+
+    // Advertise a service that resets the optimizer to its initial state
+    reset_service_server_ = rclcpp::create_service<std_srvs::srv::Empty>(
+      interfaces_.get_node_base_interface(), interfaces_.get_node_services_interface(),
+      fuse_core::joinTopicName(interfaces_.get_node_base_interface()->get_name(), params_.reset_service),
+      std::bind(&FixedLagSmoother::resetServiceCallback, this, std::placeholders::_1, std::placeholders::_2),
+      rclcpp::ServicesQoS().get_rmw_qos_profile(), interfaces_.get_node_base_interface()->get_default_callback_group());
+  }
+
+  return result;
+}
+
+bool FixedLagSmoother::activate()
+{
+  bool result = Optimizer::activate();
+
+  if (result)
+  {
+    // Test for auto-start
+    autostart();
+
+    // Start the optimization thread
+    optimization_thread_ = std::thread(&FixedLagSmoother::optimizationLoop, this);
+  }
+
+  return result;
+}
+
+bool FixedLagSmoother::deactivate()
+{
+  bool result = Optimizer::deactivate();
+
+  if (result)
+  {
+    // Wake up any sleeping threads
+    optimization_running_ = false;
+    optimization_requested_.notify_all();
+    // Wait for the threads to shutdown
+    if (optimization_thread_.joinable())
+    {
+      optimization_thread_.join();
+    }
+  }
+
+  return result;
 }
 
 void FixedLagSmoother::autostart()

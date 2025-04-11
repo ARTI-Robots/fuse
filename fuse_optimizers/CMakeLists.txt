@@ -24,6 +24,8 @@ find_package(std_srvs REQUIRED)
 find_package(diagnostic_updater REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(rclcpp_components REQUIRED)
+find_package(nav2_util REQUIRED)
+find_package(rclcpp_lifecycle REQUIRED)
 
 find_package(Ceres REQUIRED)
 find_package(Eigen3 REQUIRED)
@@ -34,7 +36,8 @@ find_package(Eigen3 REQUIRED)
 
 # fuse_optimizers library
 add_library(${PROJECT_NAME} src/batch_optimizer.cpp src/fixed_lag_smoother.cpp
-                            src/optimizer.cpp src/variable_stamp_index.cpp)
+                            src/optimizer.cpp src/variable_stamp_index.cpp
+                            src/optimizer_node.cpp include/fuse_optimizers/optimizer_node.h)
 target_include_directories(
   ${PROJECT_NAME}
   PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
@@ -48,7 +51,7 @@ target_link_libraries(
   fuse_variables::fuse_variables
   pluginlib::pluginlib
   ${std_srvs_TARGETS})
-ament_target_dependencies(${PROJECT_NAME} diagnostic_updater)
+ament_target_dependencies(${PROJECT_NAME} diagnostic_updater nav2_util)
 
 # batch_optimizer node
 add_executable(batch_optimizer_node src/batch_optimizer_node.cpp)
@@ -92,10 +95,12 @@ ament_export_dependencies(
   fuse_msgs
   fuse_graphs
   fuse_variables
+  nav2_util
   std_srvs
   diagnostic_updater
   pluginlib
   rclcpp_components
+  rclcpp_lifecycle
   Ceres
   Eigen3)
 

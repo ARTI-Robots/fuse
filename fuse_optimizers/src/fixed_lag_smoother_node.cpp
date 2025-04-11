@@ -36,14 +36,16 @@
 #include <fuse_graphs/hash_graph_params.hpp>
 #include <fuse_optimizers/fixed_lag_smoother.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <fuse_optimizers/optimizer_node.h>
 
 int main(int argc, char** argv)
 {
   rclcpp::init(argc, argv);
-  auto node = std::make_shared<rclcpp::Node>("fixed_lag_smoother_node");
+  auto node = std::make_shared<fuse_optimizers::OptimizerNode>("fixed_lag_smoother_node");
   auto optimizer = std::make_shared<fuse_optimizers::FixedLagSmoother>(*node);
+  node->setOptimizer(optimizer);
 
-  rclcpp::spin(node);
+  rclcpp::spin(node->get_node_base_interface());
   rclcpp::shutdown();
   return 0;
 }
