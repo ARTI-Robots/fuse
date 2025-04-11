@@ -131,6 +131,8 @@ bool FixedLagSmoother::activate()
     // Test for auto-start
     autostart();
 
+    optimization_running_ = true;
+
     // Start the optimization thread
     optimization_thread_ = std::thread(&FixedLagSmoother::optimizationLoop, this);
   }
