@@ -334,11 +334,12 @@ void Odometry2DPublisher::publishTimerCallback()
     if (should_publish_zero_ && params_.publish_tf)
     {
         auto frame_id = params_.world_frame_id;
-        auto child_frame_id = params_.base_link_output_frame_id;
+        auto child_frame_id = params_.odom_frame_id;
 
         if (params_.invert_tf)
         {
-            std::swap(frame_id, child_frame_id);
+            frame_id = params_.base_link_frame_id;
+            child_frame_id = params_.world_frame_id;
         }
 
         geometry_msgs::msg::TransformStamped trans;
