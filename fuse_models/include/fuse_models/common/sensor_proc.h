@@ -539,6 +539,13 @@ inline bool processDifferentialPoseWithCovariance(
     return false;
   }
 
+  if (pose1.header.stamp >= pose2.header.stamp)
+  {
+    ROS_WARN_STREAM_THROTTLE(1.0, "Process differential pose at '" << source << "': The first pose timestamp is "
+                                  "greater or equal than the second pose timestamp. Ignoring this pair of poses");
+    return false;
+  }
+
   // Convert the poses into tf2_2d transforms
   tf2_2d::Transform pose1_2d;
   tf2::fromMsg(pose1.pose.pose, pose1_2d);
@@ -886,6 +893,13 @@ inline bool processDifferentialPose3DWithCovariance(
     return false;
   }
 
+  if (pose1.header.stamp >= pose2.header.stamp)
+  {
+    ROS_WARN_STREAM_THROTTLE(1.0, "Process differential pose at '" << source << "': The first pose timestamp is "
+                                  "greater or equal than the second pose timestamp. Ignoring this pair of poses");
+    return false;
+  }
+
   // Create the pose variables
   auto position1 = fuse_variables::Position3DStamped::make_shared(pose1.header.stamp, device_id);
   auto orientation1 =
@@ -1096,6 +1110,13 @@ inline bool processDifferentialPoseWithTwistCovariance(
     return false;
   }
 
+  if (pose1.header.stamp >= pose2.header.stamp)
+  {
+    ROS_WARN_STREAM_THROTTLE(1.0, "Process differential pose at '" << source << "': The first pose timestamp is "
+                                  "greater or equal than the second pose timestamp. Ignoring this pair of poses");
+    return false;
+  }
+
   // Convert the poses into tf2_2d transforms
   tf2_2d::Transform pose1_2d;
   tf2::fromMsg(pose1.pose.pose, pose1_2d);
@@ -1281,6 +1302,13 @@ inline bool processDifferentialPoseWithTwist3DCovariance(
 {
   if (position_indices.empty() && orientation_indices.empty())
   {
+    return false;
+  }
+
+  if (pose1.header.stamp >= pose2.header.stamp)
+  {
+    ROS_WARN_STREAM_THROTTLE(1.0, "Process differential pose at '" << source << "': The first pose timestamp is "
+                                  "greater or equal than the second pose timestamp. Ignoring this pair of poses");
     return false;
   }
 
