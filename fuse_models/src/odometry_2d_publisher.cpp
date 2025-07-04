@@ -413,8 +413,8 @@ void Odometry2DPublisher::publishTimerCallback()
       acceleration_output.accel.accel.linear.y = acceleration_linear.y();
     }
 
-    odom_output.header.stamp = timer_now;
-    acceleration_output.header.stamp = timer_now;
+    odom_output.header.stamp = timer_now + rclcpp::Duration::from_seconds(params_.transform_tolerance);
+    acceleration_output.header.stamp = timer_now + rclcpp::Duration::from_seconds(params_.transform_tolerance);
 
     // Either the last covariance computation was skipped because there was no subscriber,
     // or it failed
@@ -490,6 +490,12 @@ void Odometry2DPublisher::publishTimerCallback()
       acceleration_output.accel.covariance[6] = covariance(7, 6);
       acceleration_output.accel.covariance[7] = covariance(7, 7);
     }
+  }
+  else {
+    odom_output.header.stamp = rclcpp::Time(odom_output.header.stamp) +
+            rclcpp::Duration::from_seconds(params_.transform_tolerance);
+    acceleration_output.header.stamp = rclcpp::Time(acceleration_output.header.stamp) +
+            rclcpp::Duration::from_seconds(params_.transform_tolerance);
   }
 
   odom_pub_->publish(odom_output);

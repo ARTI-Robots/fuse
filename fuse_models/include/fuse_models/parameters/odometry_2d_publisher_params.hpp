@@ -92,6 +92,8 @@ public:
         fuse_core::getParam(interfaces, fuse_core::joinParameterName(ns, "scale_process_noise"), scale_process_noise);
     velocity_norm_min =
         fuse_core::getParam(interfaces, fuse_core::joinParameterName(ns, "velocity_norm_min"), velocity_norm_min);
+    transform_tolerance =
+        fuse_core::getParam(interfaces, fuse_core::joinParameterName(ns, "transform_tolerance"), transform_tolerance);
 
     fuse_core::getPositiveParam(interfaces, fuse_core::joinParameterName(ns, "covariance_throttle_period"),
                                 covariance_throttle_period, false);
@@ -149,6 +151,7 @@ public:
   fuse_core::Matrix8d process_noise_covariance;  //!< Process noise covariance matrix
   bool scale_process_noise{ false };
   double velocity_norm_min{ 1e-3 };
+  double transform_tolerance{ 0.0 };
   rclcpp::Duration covariance_throttle_period{ 0, 0 };  //!< The throttle period duration in seconds
                                                         //!< to compute the covariance
   rclcpp::Duration tf_cache_time{ 10, 0 };
