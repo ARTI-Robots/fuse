@@ -377,6 +377,8 @@ void Odometry2DPublisher::publishTimerCallback()
   tf2_2d::Transform pose;
   tf2::fromMsg(odom_output.pose.pose, pose);
 
+  rclcpp::Time transformation_time = odom_output.header.stamp;
+
   // If requested, we need to project our state forward in time using the 2D kinematic model
   if (params_.predict_to_current_time)
   {
@@ -492,10 +494,8 @@ void Odometry2DPublisher::publishTimerCallback()
     }
   }
   else {
-    odom_output.header.stamp = rclcpp::Time(odom_output.header.stamp) +
-            rclcpp::Duration::from_seconds(params_.transform_tolerance);
-    acceleration_output.header.stamp = rclcpp::Time(acceleration_output.header.stamp) +
-            rclcpp::Duration::from_seconds(params_.transform_tolerance);
+    odom_output.header.stamp = transformation_time + rclcpp::Duration::from_seconds(params_.transform_tolerance);
+    acceleration_output.header.stamp = transformation_time + rclcpp::Duration::from_seconds(params_.transform_tolerance);
   }
 
   odom_pub_->publish(odom_output);
@@ -512,8 +512,9 @@ void Odometry2DPublisher::publishTimerCallback()
       std::swap(frame_id, child_frame_id);
     }
 
+    //the lookup needs to be performed with the message time to have a proper transformation between odom and map
     geometry_msgs::msg::TransformStamped trans;
-    trans.header.stamp = odom_output.header.stamp;
+    trans.header.stamp = transformation_time;
     trans.header.frame_id = frame_id;
     trans.child_frame_id = child_frame_id;
     trans.transform.translation.x = pose.getX();
@@ -543,7 +544,8 @@ void Odometry2DPublisher::publishTimerCallback()
         return;
       }
     }
-
+    //apply the predating as for the other topics
+    trans.header.stamp = transformation_time + rclcpp::Duration::from_seconds(params_.transform_tolerance);
     tf_broadcaster_->sendTransform(trans);
   }
 }
