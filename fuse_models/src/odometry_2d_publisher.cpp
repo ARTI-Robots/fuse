@@ -418,6 +418,9 @@ void Odometry2DPublisher::publishTimerCallback()
     odom_output.header.stamp = timer_now + rclcpp::Duration::from_seconds(params_.transform_tolerance);
     acceleration_output.header.stamp = timer_now + rclcpp::Duration::from_seconds(params_.transform_tolerance);
 
+    //we need to update the transformation time as this is the time the odometry was calculated for
+    transformation_time = odom_output.header.stamp;
+
     // Either the last covariance computation was skipped because there was no subscriber,
     // or it failed
     if (latest_covariance_valid)
