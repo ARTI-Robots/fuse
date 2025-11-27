@@ -401,7 +401,7 @@ public:
   /**
    * @brief Read-only access to quaternion's Euler roll angle component
    */
-  double roll()
+  double roll() const
   {
     return fuse_core::getRoll(w(), x(), y(), z());
   }
@@ -409,7 +409,7 @@ public:
   /**
    * @brief Read-only access to quaternion's Euler pitch angle component
    */
-  double pitch()
+  double pitch() const
   {
     return fuse_core::getPitch(w(), x(), y(), z());
   }
@@ -417,7 +417,7 @@ public:
   /**
    * @brief Read-only access to quaternion's Euler yaw angle component
    */
-  double yaw()
+  double yaw() const
   {
     return fuse_core::getYaw(w(), x(), y(), z());
   }
