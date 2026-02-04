@@ -16,14 +16,20 @@
 
 import os
 
+import launch
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess
+from launch.actions import ExecuteProcess, EmitEvent, RegisterEventHandler
 from launch.substitutions import PathJoinSubstitution
 
 import launch_pytest
 from launch_pytest.actions import ReadyToTest
 from launch_pytest.tools import process as process_tools
-from launch_ros.actions import Node
+
+from launch_ros.events.lifecycle import ChangeState
+from launch_ros.event_handlers import OnStateTransition
+from launch_ros.actions import Node, LifecycleNode
+
+from lifecycle_msgs.msg import Transition
 
 import pytest
 
@@ -40,13 +46,11 @@ def test_proc():
 def generate_test_description(test_proc):
     test_root = "."
 
-    return LaunchDescription(
-        [
-            test_proc,
-            Node(
+    fixed_lag_node = LifecycleNode(
                 package="fuse_optimizers",
                 executable="fixed_lag_smoother_node",
                 name="fixed_lag_node",
+                namespace="",
                 output="screen",
                 parameters=[
                     PathJoinSubstitution(
@@ -58,7 +62,48 @@ def generate_test_description(test_proc):
                         ]
                     )
                 ],
-            ),
+            )
+    
+    # Automatically configure when node reaches Unconfigured state
+    configure_event = EmitEvent(
+        event=ChangeState(
+            lifecycle_node_matcher=launch.events.matches_action(fixed_lag_node),
+            transition_id=Transition.TRANSITION_CONFIGURE,
+        )
+    )
+    
+    # When configured, automatically activate
+    activate_event = RegisterEventHandler(
+        OnStateTransition(
+            target_lifecycle_node=fixed_lag_node,
+            goal_state='inactive',
+            entities=[
+                EmitEvent(
+                    event=ChangeState(
+                        lifecycle_node_matcher=launch.events.matches_action(fixed_lag_node),
+                        transition_id=Transition.TRANSITION_ACTIVATE,
+                    )
+                ),
+            ],
+        )
+    )
+
+    start_test_after_activation = RegisterEventHandler(
+        OnStateTransition(
+            target_lifecycle_node=fixed_lag_node,
+            goal_state='active',
+            entities=[
+                test_proc,  # Start test only when node reaches 'active'
+            ],
+        )
+    )
+
+    return LaunchDescription(
+        [
+            fixed_lag_node,
+            configure_event,
+            activate_event,
+            start_test_after_activation,
             ReadyToTest(),
         ]
     )

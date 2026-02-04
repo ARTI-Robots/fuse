@@ -48,6 +48,9 @@ TEST(Optimizer, Constructor)
   auto node = std::make_shared<rclcpp::Node>("example_optimizer_node");
   ExampleOptimizer optimizer(*node);
 
+  // Start the lifecycle of the optimizer:
+  ASSERT_TRUE(optimizer.configure());
+
   // Check the motion and sensor models, and publishers were loaded:
   auto const& motion_models = optimizer.getMotionModels();
   auto const& sensor_models = optimizer.getSensorModels();
