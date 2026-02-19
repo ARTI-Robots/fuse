@@ -220,16 +220,32 @@ bool HashGraph::variableExists(const fuse_core::UUID& variable_uuid) const noexc
 
 bool HashGraph::addVariable(fuse_core::Variable::SharedPtr variable)
 {
-  // Do nothing if the variable is empty, or the variable already exists
-  if (!variable || variableExists(variable->uuid()))
+  // Do nothing if the variable is empty
+  if (!variable)
   {
     return false;
   }
-  variables_.emplace(variable->uuid(), variable);
+
+  // change the hold constant state of the variable if needed
   if (variable->holdConstant())
   {
     variables_on_hold_.insert(variable->uuid());
+    ROS_DEBUG_STREAM("Variable " << *variable << " added to be on hold.");
   }
+  else
+  {
+    const auto removed_elements = variables_on_hold_.erase(variable->uuid());
+    if (removed_elements >= 1)
+    {
+      ROS_DEBUG_STREAM("Variable " << *variable << " removed to be on hold.");
+    }
+  }
+  // Ignore if the variable already exists
+  if (!variableExists(variable->uuid()))
+  {
+    variables_.emplace(variable->uuid(), variable);
+  }
+
   return true;
 }
 
