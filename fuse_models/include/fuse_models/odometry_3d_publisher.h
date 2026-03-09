@@ -207,6 +207,8 @@ protected:
 
   tf2_ros::TransformBroadcaster tf_broadcaster_;
 
+  ros::Time last_tf_broadcast_time_;
+
   std::unique_ptr<tf2_ros::TransformListener> tf_listener_;
 
   fuse_core::DelayedThrottleFilter delayed_throttle_filter_{ 10.0 };  //!< A ros::console filter to print delayed
