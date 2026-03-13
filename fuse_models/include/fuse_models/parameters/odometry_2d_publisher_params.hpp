@@ -83,6 +83,9 @@ public:
         interfaces, fuse_core::joinParameterName(ns, "predict_with_acceleration"), predict_with_acceleration);
     publish_zero_when_stopped = fuse_core::getParam(
         interfaces, fuse_core::joinParameterName(ns, "publish_zero_when_stopped"), publish_zero_when_stopped);
+    publish_delta_information = fuse_core::getParam(
+      interfaces, fuse_core::joinParameterName(ns, "publish_delta_information"), publish_delta_information);
+
     publish_frequency =
         fuse_core::getParam(interfaces, fuse_core::joinParameterName(ns, "publish_frequency"), publish_frequency);
 
@@ -133,7 +136,12 @@ public:
     topic = fuse_core::getParam(interfaces, fuse_core::joinParameterName(ns, "topic"), topic);
     acceleration_topic =
         fuse_core::getParam(interfaces, fuse_core::joinParameterName(ns, "acceleration_topic"), acceleration_topic);
-
+    delta_x_topic =
+        fuse_core::getParam(interfaces, fuse_core::joinParameterName(ns, "delta_x_topic"), delta_x_topic);
+    delta_y_topic =
+        fuse_core::getParam(interfaces, fuse_core::joinParameterName(ns, "delta_y_topic"), delta_y_topic);
+    delta_yaw_topic =
+        fuse_core::getParam(interfaces, fuse_core::joinParameterName(ns, "delta_yaw_topic"), delta_yaw_topic);
     fuse_core::loadCovarianceOptionsFromROS(interfaces, covariance_options, "covariance_options");
   }
 
@@ -147,6 +155,7 @@ public:
   bool predict_with_acceleration{ false };
   bool publish_zero_when_stopped{ false };  //!< Whether to publish a zero transformation after activating once and
                                             //!< deactivating afterwards
+  bool publish_delta_information{ false };  //!< Whether to publish deltas about pose correction
   double publish_frequency{ 10.0 };
   fuse_core::Matrix8d process_noise_covariance;  //!< Process noise covariance matrix
   bool scale_process_noise{ false };
@@ -164,6 +173,10 @@ public:
   std::string world_frame_id{ odom_frame_id };
   std::string topic{ "odometry/filtered" };
   std::string acceleration_topic{ "acceleration/filtered" };
+  std::string delta_x_topic{ "~/transformation/delta_x" };
+  std::string delta_y_topic{ "~/transformation/delta_y" };
+  std::string delta_yaw_topic{ "~/transformation/delta_yaw" };
+
   ceres::Covariance::Options covariance_options;
 };
 

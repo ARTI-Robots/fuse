@@ -32,6 +32,7 @@ find_package(tf2_2d REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 # find_package(mujoco REQUIRED)
+find_package(angles REQUIRED)
 
 find_package(Ceres REQUIRED)
 find_package(Eigen3 REQUIRED)
@@ -87,7 +88,8 @@ target_link_libraries(
   tf2::tf2
   tf2_2d::tf2_2d
   ${tf2_geometry_msgs_TARGETS}
-  tf2_ros::tf2_ros)
+  tf2_ros::tf2_ros
+  angles::angles)
 
 # ##############################################################################
 # Testing ##
@@ -134,6 +136,7 @@ ament_export_dependencies(
   tf2_2d
   tf2_geometry_msgs
   tf2_ros
+  angles
   Ceres
   Eigen3
   Boost)

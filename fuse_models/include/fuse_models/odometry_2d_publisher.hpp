@@ -55,6 +55,7 @@
 #include <geometry_msgs/msg/accel_with_covariance_stamped.hpp>
 #include <nav_msgs/msg/odometry.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <std_msgs/msg/float64.hpp>
 
 namespace fuse_models
 {
@@ -186,6 +187,14 @@ protected:
   void publishTimerCallback();
 
   /**
+   * @brief publish the given double value with the given publisher
+   * @param value to publish
+   * @param pub_to_use the publisher used to send the data
+   */
+  static void publishDouble(double value, const rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr& pub_to_use);
+
+
+  /**
    * @brief Object that searches for the most recent common timestamp for a set of variables
    */
   using Synchronizer = fuse_publishers::StampedVariableSynchronizer<
@@ -217,6 +226,10 @@ protected:
 
   rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
   rclcpp::Publisher<geometry_msgs::msg::AccelWithCovarianceStamped>::SharedPtr acceleration_pub_;
+
+  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr delta_x_publisher_;
+  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr delta_y_publisher_;
+  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr delta_yaw_publisher_;
 
   std::shared_ptr<tf2_ros::TransformBroadcaster> tf_broadcaster_ = nullptr;
   std::unique_ptr<tf2_ros::TransformListener> tf_listener_;

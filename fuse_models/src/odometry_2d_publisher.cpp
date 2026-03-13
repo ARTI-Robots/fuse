@@ -53,6 +53,7 @@
 #include <pluginlib/class_list_macros.hpp>
 #include <tf2_2d/tf2_2d.hpp>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+#include <angles/angles.h>
 
 // Register this publisher with ROS as a plugin.
 PLUGINLIB_EXPORT_CLASS(fuse_models::Odometry2DPublisher, fuse_core::Publisher)
@@ -88,7 +89,7 @@ void Odometry2DPublisher::onInit()
 
   params_.loadFromROS(interfaces_, name_);
 
-  if (!params_.invert_tf && params_.world_frame_id == params_.map_frame_id)
+  if ((!params_.invert_tf && params_.world_frame_id == params_.map_frame_id) || params_.publish_delta_information)
   {
     tf_buffer_ = std::make_unique<tf2_ros::Buffer>(
         clock_, params_.tf_cache_time.to_chrono<std::chrono::nanoseconds>()
@@ -107,6 +108,16 @@ void Odometry2DPublisher::onInit()
       rclcpp::create_publisher<nav_msgs::msg::Odometry>(interfaces_, params_.topic, params_.queue_size, pub_options);
   acceleration_pub_ = rclcpp::create_publisher<geometry_msgs::msg::AccelWithCovarianceStamped>(
       interfaces_, params_.acceleration_topic, params_.queue_size, pub_options);
+
+  if (params_.publish_delta_information)
+  {
+    delta_x_publisher_ = rclcpp::create_publisher<std_msgs::msg::Float64>(
+      interfaces_, params_.delta_x_topic, params_.queue_size, pub_options);
+    delta_y_publisher_ = rclcpp::create_publisher<std_msgs::msg::Float64>(
+      interfaces_, params_.delta_y_topic, params_.queue_size, pub_options);
+    delta_yaw_publisher_ = rclcpp::create_publisher<std_msgs::msg::Float64>(
+      interfaces_, params_.delta_yaw_topic, params_.queue_size, pub_options);
+  }
 }
 
 void Odometry2DPublisher::notifyCallback(fuse_core::Transaction::ConstSharedPtr transaction,
@@ -506,6 +517,33 @@ void Odometry2DPublisher::publishTimerCallback()
 
   if (params_.publish_tf)
   {
+    if (params_.publish_delta_information)
+    {
+      try
+      {
+        const auto odom_to_base = tf_buffer_->lookupTransform(params_.odom_frame_id, params_.base_link_frame_id,
+                                                              transformation_time, params_.tf_timeout);
+
+        const auto delta_x = odom_output.pose.pose.position.x - odom_to_base.transform.translation.x;
+        const auto delta_y = odom_output.pose.pose.position.y - odom_to_base.transform.translation.y;
+        const auto new_yaw = tf2::getYaw(odom_output.pose.pose.orientation);
+        const auto original_yaw = tf2::getYaw(odom_to_base.transform.rotation);
+        const auto delta_yaw = angles::shortest_angular_distance(new_yaw, original_yaw);
+        publishDouble(delta_x, delta_x_publisher_);
+        publishDouble(delta_y, delta_y_publisher_);
+        publishDouble(delta_yaw, delta_yaw_publisher_);
+      }
+      catch (std::exception const& e)
+      {
+        RCLCPP_WARN_STREAM_THROTTLE(logger_, *clock_, 5.0 * 1000,
+                                    "Could not lookup the " << params_.base_link_frame_id << "->"
+                                                            << params_.odom_frame_id
+                                                            << " transform. Error: " << e.what());
+
+        return;
+      }
+    }
+
     auto frame_id = odom_output.header.frame_id;
     auto child_frame_id = odom_output.child_frame_id;
 
@@ -551,6 +589,20 @@ void Odometry2DPublisher::publishTimerCallback()
     trans.header.stamp = transformation_time + rclcpp::Duration::from_seconds(params_.transform_tolerance);
     tf_broadcaster_->sendTransform(trans);
   }
+}
+
+void Odometry2DPublisher::publishDouble(double value,
+  const rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr& pub_to_use)
+{
+  if (!pub_to_use)
+  {
+    return;
+  }
+
+  std_msgs::msg::Float64 duration_msg;
+  duration_msg.data = value;
+
+  pub_to_use->publish(duration_msg);
 }
 
 }  // namespace fuse_models
