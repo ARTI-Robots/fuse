@@ -479,27 +479,36 @@ void Optimizer::startPlugins()
 
 void Optimizer::stopPlugins()
 {
+  RCLCPP_INFO_STREAM(logger_, "Stopping all plugins.");
+
   if (plugins_stopped_)
   {
     return;
   }
 
+  RCLCPP_INFO_STREAM(logger_, "Stopping all publishers.");
   for (auto const& name_plugin : publishers_)
   {
     name_plugin.second->stop();
   }
+
+  RCLCPP_INFO_STREAM(logger_, "Stopping all sensor models.");
   for (auto const& name_plugin : sensor_models_)
   {
     name_plugin.second.model->stop();
   }
+
+  RCLCPP_INFO_STREAM(logger_, "Stopping all motion models.");
   for (auto const& name_plugin : motion_models_)
   {
     name_plugin.second->stop();
   }
 
+  RCLCPP_INFO_STREAM(logger_, "Stopping all force a diagnostic update.");
   diagnostic_updater_.force_update();
 
   plugins_stopped_ = true;
+  RCLCPP_INFO_STREAM(logger_, "Everything is stopped.");
 }
 
 void Optimizer::setDiagnostics(diagnostic_updater::DiagnosticStatusWrapper& status)

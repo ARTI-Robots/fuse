@@ -142,10 +142,13 @@ bool FixedLagSmoother::activate()
 
 bool FixedLagSmoother::deactivate()
 {
+  RCLCPP_INFO_STREAM(logger_, "Deactivating fixed lag smoother.");
+
   bool result = Optimizer::deactivate();
 
   if (result)
   {
+    RCLCPP_INFO_STREAM(logger_, "Wakeup thread and stoping optimization.");
     // Wake up any sleeping threads
     optimization_running_ = false;
     optimization_requested_.notify_all();
@@ -154,7 +157,14 @@ bool FixedLagSmoother::deactivate()
     {
       optimization_thread_.join();
     }
+    RCLCPP_INFO_STREAM(logger_, "Optimization is stopped.");
   }
+  else
+  {
+    RCLCPP_ERROR_STREAM(logger_, "Deactivating of optimizer failed.");
+  }
+
+  RCLCPP_INFO_STREAM(logger_, "Done deactivating fixed lag smoother.");
 
   return result;
 }

@@ -26,6 +26,7 @@ find_package(pluginlib REQUIRED)
 find_package(rclcpp_components REQUIRED)
 find_package(nav2_util REQUIRED)
 find_package(rclcpp_lifecycle REQUIRED)
+find_package(backward_ros REQUIRED)
 
 find_package(Ceres REQUIRED)
 find_package(Eigen3 REQUIRED)
@@ -51,7 +52,7 @@ target_link_libraries(
   fuse_variables::fuse_variables
   pluginlib::pluginlib
   ${std_srvs_TARGETS})
-ament_target_dependencies(${PROJECT_NAME} diagnostic_updater nav2_util)
+ament_target_dependencies(${PROJECT_NAME} diagnostic_updater nav2_util backward_ros)
 
 # batch_optimizer node
 add_executable(batch_optimizer_node src/batch_optimizer_node.cpp)

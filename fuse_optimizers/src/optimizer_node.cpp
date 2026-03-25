@@ -81,6 +81,7 @@ OptimizerNode::CallbackReturn OptimizerNode::on_deactivate(const rclcpp_lifecycl
         return CallbackReturn::FAILURE;
     }
 
+    RCLCPP_INFO(get_logger(), "destroying the bond");
     destroyBond();
 
     RCLCPP_INFO(get_logger(), "Deactivating node finished");
