@@ -466,8 +466,61 @@ void Odometry2DPublisher::publishTimerCallback(const ros::TimerEvent& event)
     }
   }
 
-  odom_pub_.publish(odom_output);
-  acceleration_pub_.publish(acceleration_output);
+  nav_msgs::Odometry odom_to_pub = odom_output;
+  odom_to_pub.child_frame_id = params_.base_link_publishing_frame_id;
+  if (params_.base_link_output_frame_id != params_.base_link_publishing_frame_id)
+  {
+    try
+    {
+      const auto trans_child_frames = tf_buffer_->lookupTransform(odom_output.child_frame_id, params_.base_link_publishing_frame_id, odom_output.header.stamp);
+
+      geometry_msgs::TransformStamped odom_trans;
+      odom_trans.header.stamp = odom_output.header.stamp;
+      odom_trans.header.frame_id = odom_output.header.frame_id;
+      odom_trans.child_frame_id = odom_output.child_frame_id;
+      odom_trans.transform.translation.x = odom_output.pose.pose.position.x;
+      odom_trans.transform.translation.y = odom_output.pose.pose.position.y;
+      odom_trans.transform.translation.z = odom_output.pose.pose.position.z;
+      odom_trans.transform.rotation = tf2::toMsg(pose.getRotation());
+
+      geometry_msgs::TransformStamped transformed_odom_trans;
+      tf2::doTransform(trans_child_frames, transformed_odom_trans, odom_trans);
+
+      odom_to_pub.pose.pose.position.x = transformed_odom_trans.transform.translation.x;
+      odom_to_pub.pose.pose.position.y = transformed_odom_trans.transform.translation.x;
+      odom_to_pub.pose.pose.position.z = transformed_odom_trans.transform.translation.z;
+
+      tf2::doTransform(odom_output.twist, odom_to_pub.twist, trans_child_frames);
+    }
+    catch (const std::exception& e)
+    {
+      ROS_WARN_STREAM_THROTTLE(5.0, "Could not lookup the " << params_.base_link_publishing_frame_id << "->" <<
+        params_.base_link_output_frame_id << " transform. Error: " << e.what());
+
+      return;
+    }
+  }
+  odom_pub_.publish(odom_to_pub);
+
+  geometry_msgs::AccelWithCovarianceStamped acceleration_to_pub = acceleration_output;
+  acceleration_to_pub.header.frame_id = params_.base_link_publishing_frame_id;
+  if (params_.base_link_output_frame_id != params_.base_link_publishing_frame_id)
+  {
+    try
+    {
+      const auto trans_child_frames = tf_buffer_->lookupTransform(params_.base_link_publishing_frame_id, odom_output.child_frame_id, odom_output.header.stamp);
+
+      tf2::doTransform(acceleration_output, acceleration_to_pub, trans_child_frames);
+    }
+    catch (const std::exception& e)
+    {
+      ROS_WARN_STREAM_THROTTLE(5.0, "Could not lookup the " << params_.base_link_publishing_frame_id << "->" <<
+        params_.base_link_output_frame_id << " transform. Error: " << e.what());
+
+      return;
+    }
+  }
+  acceleration_pub_.publish(acceleration_to_pub);
 
   if (params_.publish_tf)
   {
