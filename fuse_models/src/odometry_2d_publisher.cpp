@@ -489,7 +489,7 @@ void Odometry2DPublisher::publishTimerCallback(const ros::TimerEvent& event)
       tf2::doTransform(trans_child_frames, transformed_odom_trans, odom_trans);
 
       odom_to_pub.pose.pose.position.x = transformed_odom_trans.transform.translation.x;
-      odom_to_pub.pose.pose.position.y = transformed_odom_trans.transform.translation.x;
+      odom_to_pub.pose.pose.position.y = transformed_odom_trans.transform.translation.y;
       odom_to_pub.pose.pose.position.z = transformed_odom_trans.transform.translation.z;
 
       tf2::doTransform(odom_output.twist, odom_to_pub.twist, trans_child_frames);
