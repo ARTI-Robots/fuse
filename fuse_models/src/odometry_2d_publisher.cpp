@@ -472,7 +472,9 @@ void Odometry2DPublisher::publishTimerCallback(const ros::TimerEvent& event)
   {
     try
     {
-      const auto trans_child_frames = tf_buffer_->lookupTransform(odom_output.child_frame_id, params_.base_link_publishing_frame_id, odom_output.header.stamp);
+      const auto trans_child_frames = tf_buffer_->lookupTransform(odom_output.child_frame_id,
+                                                                  params_.base_link_publishing_frame_id,
+                                                                  odom_output.header.stamp, params_.tf_timeout);
 
       geometry_msgs::TransformStamped odom_trans;
       odom_trans.header.stamp = odom_output.header.stamp;
@@ -495,9 +497,9 @@ void Odometry2DPublisher::publishTimerCallback(const ros::TimerEvent& event)
     catch (const std::exception& e)
     {
       ROS_WARN_STREAM_THROTTLE(5.0, "Could not lookup the " << params_.base_link_publishing_frame_id << "->" <<
-        params_.base_link_output_frame_id << " transform. Error: " << e.what());
+        params_.base_link_output_frame_id << " transform. Error: " << e.what() << " will not perform the transform");
 
-      return;
+      odom_to_pub = odom_output;
     }
   }
   odom_pub_.publish(odom_to_pub);
@@ -508,16 +510,18 @@ void Odometry2DPublisher::publishTimerCallback(const ros::TimerEvent& event)
   {
     try
     {
-      const auto trans_child_frames = tf_buffer_->lookupTransform(params_.base_link_publishing_frame_id, odom_output.child_frame_id, odom_output.header.stamp);
+      const auto trans_child_frames = tf_buffer_->lookupTransform(params_.base_link_publishing_frame_id,
+                                                                  odom_output.child_frame_id, odom_output.header.stamp,
+                                                                  params_.tf_timeout);
 
       tf2::doTransform(acceleration_output, acceleration_to_pub, trans_child_frames);
     }
     catch (const std::exception& e)
     {
       ROS_WARN_STREAM_THROTTLE(5.0, "Could not lookup the " << params_.base_link_publishing_frame_id << "->" <<
-        params_.base_link_output_frame_id << " transform. Error: " << e.what());
+        params_.base_link_output_frame_id << " transform. Error: " << e.what() << " will not perform the transform");
 
-      return;
+      acceleration_to_pub = acceleration_output;
     }
   }
   acceleration_pub_.publish(acceleration_to_pub);
