@@ -78,6 +78,11 @@ public:
   ceres::Solver::Options solver_options;
 
   /**
+   * @brief Whether to log the optimization summary after each optimization cycle.
+   */
+  bool log_optimization_summary {false};
+
+  /**
    * @brief Method for loading parameter values from ROS.
    *
    * @param[in] nh - The ROS node handle with which to load parameters
@@ -99,6 +104,8 @@ public:
     fuse_core::getPositiveParam(nh, "transaction_timeout", transaction_timeout);
 
     fuse_core::loadSolverOptionsFromROS(ros::NodeHandle(nh, "solver_options"), solver_options);
+
+    nh.getParam("log_optimization_summary", log_optimization_summary);
   }
 };
 

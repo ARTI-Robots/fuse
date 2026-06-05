@@ -147,7 +147,13 @@ void BatchOptimizer::optimizationLoop()
     // Update the graph
     graph_->update(*const_transaction);
     // Optimize the entire graph
-    graph_->optimize(params_.solver_options);
+    auto summary = graph_->optimize(params_.solver_options);
+
+    if (params_.log_optimization_summary)
+    {
+      ROS_INFO_STREAM("Optimization summary: " << summary.FullReport());
+    }
+
     // Make a copy of the graph to share
     fuse_core::Graph::ConstSharedPtr const_graph = graph_->clone();
     // Optimization is complete. Notify all the things about the graph changes.

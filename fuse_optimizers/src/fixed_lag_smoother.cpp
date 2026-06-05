@@ -223,6 +223,12 @@ void FixedLagSmoother::optimizationLoop()
       // Optimize the entire graph
       summary_ = graph_->optimize(params_.solver_options);
 
+      if (params_.log_optimization_summary)
+      {
+        ROS_INFO_STREAM("Optimization summary for transaction with timestamp " << new_transaction->stamp() << ":\n"
+                                                                               << summary_.FullReport());
+      }
+
       // Abort if optimization failed. Not converging is not a failure because the solution found is usable.
       if (!summary_.IsSolutionUsable())
       {
@@ -614,6 +620,27 @@ void FixedLagSmoother::setDiagnostics(diagnostic_updater::DiagnosticStatusWrappe
       status.add("Optimization Iterations", summary.iterations.size());
       status.add("Initial Cost", summary.initial_cost);
       status.add("Final Cost", summary.final_cost);
+
+      status.add("message", summary.message);
+      status.add("num_successful_steps", summary.num_successful_steps);
+      status.add("num_unsuccessful_steps", summary.num_unsuccessful_steps);
+      status.add("num_inner_iteration_steps", summary.num_inner_iteration_steps);
+      status.add("num_line_search_steps", summary.num_line_search_steps);
+      status.add("preprocessor_time_in_seconds", summary.preprocessor_time_in_seconds);
+      status.add("minimizer_time_in_seconds", summary.minimizer_time_in_seconds);
+      status.add("postprocessor_time_in_seconds", summary.postprocessor_time_in_seconds);
+      status.add("total_time_in_seconds", summary.total_time_in_seconds);
+      status.add("linear_solver_time_in_seconds", summary.linear_solver_time_in_seconds);
+      status.add("num_parameter_blocks", summary.num_parameter_blocks);
+      status.add("num_parameters", summary.num_parameters);
+      status.add("num_effective_parameters", summary.num_effective_parameters);
+      status.add("num_residual_blocks", summary.num_residual_blocks);
+      status.add("num_residuals", summary.num_residuals);
+      status.add("num_parameter_blocks_reduced", summary.num_parameter_blocks_reduced);
+      status.add("num_parameters_reduced", summary.num_parameters_reduced);
+      status.add("num_effective_parameters_reduced", summary.num_effective_parameters_reduced);
+      status.add("num_residual_blocks_reduced", summary.num_residual_blocks_reduced);
+      status.add("num_residuals_reduced", summary.num_residuals_reduced);
 
       status.mergeSummary(terminationTypeToDiagnosticStatus(summary.termination_type));
     }
