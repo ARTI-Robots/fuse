@@ -45,7 +45,9 @@ class MyMotionModel : public fuse_core::AsyncMotionModel
 public:
   MyMotionModel() :
     fuse_core::AsyncMotionModel(1),
-    initialized(false)
+    graph_received(false),
+    initialized(false),
+    transaction_received(false)
   {
   }
 
