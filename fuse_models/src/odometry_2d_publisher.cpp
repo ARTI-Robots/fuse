@@ -418,8 +418,9 @@ void Odometry2DPublisher::publishTimerCallback()
     odom_output.header.stamp = timer_now + rclcpp::Duration::from_seconds(params_.transform_tolerance);
     acceleration_output.header.stamp = timer_now + rclcpp::Duration::from_seconds(params_.transform_tolerance);
 
-    //we need to update the transformation time as this is the time the odometry was calculated for
-    transformation_time = odom_output.header.stamp;
+    // Keep the calculation time separate from the predated message stamp. The TF
+    // timestamp is predated below after the lookup that uses the calculation time.
+    transformation_time = timer_now;
 
     // Either the last covariance computation was skipped because there was no subscriber,
     // or it failed
