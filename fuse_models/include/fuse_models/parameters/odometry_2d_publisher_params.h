@@ -138,9 +138,12 @@ public:
   int queue_size { 1 };
   std::string map_frame_id { "map" };
   std::string odom_frame_id { "odom" };
-  std::string base_link_frame_id { "base_link" }; //!< Frame used in the transformation published
-  std::string base_link_output_frame_id { base_link_frame_id }; //!< Frame the filter is using internally assumed to be the same as base_link_frame_id if a tf is published
-  std::string base_link_publishing_frame_id { base_link_frame_id }; //!< Frame used for publishing odometry and acceleration data
+  std::string base_link_frame_id { "base_link" };  //!< Frame used in the transformation published
+  std::string base_link_output_frame_id { base_link_frame_id };  //!< Frame the filter is using internally assumed
+                                                               //!< to be the same as base_link_frame_id if a tf
+                                                             //!< is published
+  std::string base_link_publishing_frame_id { base_link_frame_id };  //!< Frame used for publishing odometry and
+                                                                   //!< acceleration data
   std::string world_frame_id { odom_frame_id };
   std::string topic { "odometry/filtered" };
   std::string acceleration_topic { "acceleration/filtered" };
