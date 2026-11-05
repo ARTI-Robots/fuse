@@ -59,6 +59,7 @@ class MySensor : public fuse_core::AsyncSensorModel
 public:
   MySensor() :
     fuse_core::AsyncSensorModel(1),
+    graph_received(false),
     initialized(false)
   {
   }

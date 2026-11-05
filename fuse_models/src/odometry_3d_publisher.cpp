@@ -638,7 +638,14 @@ void Odometry3DPublisher::publishTimerCallback(const ros::TimerEvent& event)
   odom_pub_.publish(odom_output);
   acceleration_pub_.publish(acceleration_output);
 
-  if (params_.publish_tf)
+  // Publish a tf if enabled and there is a different (practically said new) time
+  // Checking the time is important since otherwise at ROS 1 Noetic an internal warning messages spams the log (which
+  // cannot be disabled) and publishing a tf with the same time as before anyway is ignored.
+  // In practice if predict_to_current_time == true, this does not have an effect. If predict_to_current_time == false,
+  // then in case this check is not there and the publisher rate has a same/lower publishing rate than the optimizer
+  // frequency, the above issue appears.
+  // For more information see also: https://github.com/ros/geometry2/issues/467
+  if (params_.publish_tf && odom_output.header.stamp != last_tf_broadcast_time_)
   {
     auto frame_id = odom_output.header.frame_id;
     auto child_frame_id = odom_output.child_frame_id;
@@ -680,6 +687,7 @@ void Odometry3DPublisher::publishTimerCallback(const ros::TimerEvent& event)
     }
 
     tf_broadcaster_.sendTransform(trans);
+    last_tf_broadcast_time_ = trans.header.stamp;
   }
 }
 
