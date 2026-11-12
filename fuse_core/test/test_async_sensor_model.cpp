@@ -35,7 +35,7 @@
 #include <ros/ros.h>
 
 #include <gtest/gtest.h>
-
+#include <string>
 
 /**
  * @brief Flag used to track the execution of the transaction callback

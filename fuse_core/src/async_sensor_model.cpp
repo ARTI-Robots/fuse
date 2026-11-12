@@ -129,7 +129,6 @@ void AsyncSensorModel::start()
 
 void AsyncSensorModel::stop()
 {
-
   if (active_)
   {
     active_ = false;
@@ -186,7 +185,7 @@ bool AsyncSensorModel::enableSensorCallback(std_srvs::SetBoolRequest& request, s
 
 void AsyncSensorModel::startStopThreadLoop()
 {
-  while(true)
+  while (true)
   {
     std::unique_lock<std::mutex> lock(start_stop_mutex_);
     while (start_stop_request_ == StartStopEnum::KEEP_SENSOR_STATE)
@@ -203,7 +202,7 @@ void AsyncSensorModel::startStopThreadLoop()
         stop();
         break;
       case StartStopEnum::KEEP_SENSOR_STATE:
-        //nothing to do just wait for the next call
+        // nothing to do just wait for the next call
         break;
       case StartStopEnum::STOP_THREAD:
         return;

@@ -261,7 +261,6 @@ protected:
   void startStopThreadLoop();
 
   void publishSensorsEnabled();
-
 };
 
 }  // namespace fuse_core
