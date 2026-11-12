@@ -175,6 +175,26 @@ protected:
   void publishTimerCallback(const ros::TimerEvent& event);
 
   /**
+   * @brief convert the covariance matrix from the odometry and acceleration messages to a 15x15 matrix
+   *
+   * @param odom odometry message used to get the covariance of the pose and twist
+   * @param acceleration acceleration message used to get the covariance of the acceleration values
+   * @return the covariance matrix
+   */
+  fuse_core::Matrix15d convertCovariance(const nav_msgs::Odometry& odom,
+                                        const geometry_msgs::AccelWithCovarianceStamped& acceleration) const;
+
+  /**
+   * @brief update the covariance matrix in the odometry and acceleration messages
+   *
+   * @param covariance matrix to be used to populate the covariance matrix in the odometry and acceleration messages
+   * @param odom odometry message to be updated with the covariance matrix
+   * @param acceleration acceleration message to be updated with the covariance matrix
+   */
+  void updateCovariance(const fuse_core::Matrix15d& covariance, nav_msgs::Odometry& odom,
+                        geometry_msgs::AccelWithCovarianceStamped& acceleration) const;
+
+  /**
    * @brief Object that searches for the most recent common timestamp for a set of variables
    */
   using Synchronizer = fuse_publishers::StampedVariableSynchronizer<fuse_variables::Orientation3DStamped,

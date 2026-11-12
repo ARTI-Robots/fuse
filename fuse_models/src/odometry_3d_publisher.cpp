@@ -503,58 +503,7 @@ void Odometry3DPublisher::publishTimerCallback(const ros::TimerEvent& event)
     // or it failed
     if (latest_covariance_valid)
     {
-      fuse_core::Matrix15d covariance;
-
-      // position
-      for (size_t row_i = 0; row_i < 3; ++row_i)
-      {
-        for (size_t col_i = 0; col_i < 3; ++col_i)
-        {
-          covariance(row_i, col_i) = odom_output.pose.covariance[col_i * 6 + row_i];
-        }
-      }
-
-      // orientation
-      for (size_t row_i = 3; row_i < 6; ++row_i)
-      {
-        for (size_t col_i = 3; col_i < 6; ++col_i)
-        {
-          covariance(row_i, col_i) = odom_output.pose.covariance[col_i * 6 + row_i];
-        }
-      }
-
-      // linear velocity
-      size_t covariance_matrix_offset = 6;
-      for (size_t row_i = 0; row_i < 3; ++row_i)
-      {
-        for (size_t col_i = 0; col_i < 3; ++col_i)
-        {
-          covariance(covariance_matrix_offset + row_i, covariance_matrix_offset + col_i) =
-            odom_output.twist.covariance[col_i * 6 + row_i];
-        }
-      }
-
-      // angular velocity
-      covariance_matrix_offset = 6;
-      for (size_t row_i = 3; row_i < 6; ++row_i)
-      {
-        for (size_t col_i = 3; col_i < 6; ++col_i)
-        {
-          covariance(covariance_matrix_offset + row_i, covariance_matrix_offset + col_i) =
-            odom_output.twist.covariance[col_i * 6 + row_i];
-        }
-      }
-
-      // linear acceleration
-      covariance_matrix_offset = 12;
-      for (size_t row_i = 0; row_i < 3; ++row_i)
-      {
-        for (size_t col_i = 0; col_i < 3; ++col_i)
-        {
-          covariance(covariance_matrix_offset + row_i, covariance_matrix_offset + col_i) =
-            acceleration_output.accel.covariance[col_i * 6 + row_i];
-        }
-      }
+      fuse_core::Matrix15d covariance = convertCovariance(odom_output, acceleration_output);
 
       // TODO(efernandez) for now we leave the out-of-diagonal blocks with the correlations between pose, twist
       // and acceleration zero, but we could cache them in another attribute when we retrieve the covariance from
@@ -582,61 +531,87 @@ void Odometry3DPublisher::publishTimerCallback(const ros::TimerEvent& event)
 
       covariance.noalias() += dt * process_noise_covariance;
 
-      // position
-      for (size_t row_i = 0; row_i < 3; ++row_i)
-      {
-        for (size_t col_i = 0; col_i < 3; ++col_i)
-        {
-          odom_output.pose.covariance[col_i * 6 + row_i] = covariance(row_i, col_i);
-        }
-      }
-
-      // orientation
-      for (size_t row_i = 3; row_i < 6; ++row_i)
-      {
-        for (size_t col_i = 3; col_i < 6; ++col_i)
-        {
-          odom_output.pose.covariance[col_i * 6 + row_i] = covariance(row_i, col_i);
-        }
-      }
-
-      // linear velocity
-      covariance_matrix_offset = 6;
-      for (size_t row_i = 0; row_i < 3; ++row_i)
-      {
-        for (size_t col_i = 0; col_i < 3; ++col_i)
-        {
-          odom_output.twist.covariance[col_i * 6 + row_i] =
-            covariance(covariance_matrix_offset + row_i, covariance_matrix_offset + col_i);
-        }
-      }
-
-      // angular velocity
-      covariance_matrix_offset = 6;
-      for (size_t row_i = 3; row_i < 6; ++row_i)
-      {
-        for (size_t col_i = 3; col_i < 6; ++col_i)
-        {
-          odom_output.twist.covariance[col_i * 6 + row_i] =
-            covariance(covariance_matrix_offset + row_i, covariance_matrix_offset + col_i);
-        }
-      }
-
-      // linear acceleration
-      covariance_matrix_offset = 12;
-      for (size_t row_i = 0; row_i < 3; ++row_i)
-      {
-        for (size_t col_i = 0; col_i < 3; ++col_i)
-        {
-          acceleration_output.accel.covariance[col_i * 6 + row_i] =
-            covariance(covariance_matrix_offset + row_i, covariance_matrix_offset + col_i);
-        }
-      }
+      updateCovariance(covariance, odom_output, acceleration_output);
     }
   }
 
-  odom_pub_.publish(odom_output);
-  acceleration_pub_.publish(acceleration_output);
+  nav_msgs::Odometry odom_to_pub = odom_output;
+  odom_to_pub.child_frame_id = params_.base_link_publishing_frame_id;
+  if (params_.base_link_output_frame_id != params_.base_link_publishing_frame_id)
+  {
+    try
+    {
+      const auto trans_child_frames = tf_buffer_->lookupTransform(odom_output.child_frame_id,
+                                                                  params_.base_link_publishing_frame_id,
+                                                                  odom_output.header.stamp, params_.tf_timeout);
+
+      geometry_msgs::TransformStamped odom_trans;
+      odom_trans.header.stamp = odom_output.header.stamp;
+      odom_trans.header.frame_id = odom_output.header.frame_id;
+      odom_trans.child_frame_id = odom_output.child_frame_id;
+      odom_trans.transform.translation.x = odom_output.pose.pose.position.x;
+      odom_trans.transform.translation.y = odom_output.pose.pose.position.y;
+      odom_trans.transform.translation.z = odom_output.pose.pose.position.z;
+      odom_trans.transform.rotation = tf2::toMsg(pose.getRotation());
+
+      geometry_msgs::TransformStamped transformed_odom_trans;
+      tf2::doTransform(trans_child_frames, transformed_odom_trans, odom_trans);
+
+      odom_to_pub.pose.pose.position.x = transformed_odom_trans.transform.translation.x;
+      odom_to_pub.pose.pose.position.y = transformed_odom_trans.transform.translation.y;
+      odom_to_pub.pose.pose.position.z = transformed_odom_trans.transform.translation.z;
+
+      fuse_core::Matrix15d covariance = convertCovariance(odom_output, acceleration_output);
+
+      // Rotate the process noise covariance with the angle of the current state orientation
+      Eigen::Matrix3d rotation_matrix;
+      for (int i = 0; i < 3; ++i)
+      {
+        for (int j = 0; j < 3; ++j)
+        {
+          rotation_matrix(i, j) = pose.getBasis()[i][j];
+        }
+      }
+
+      // Apply only to x, y and z position as the other state variables are already along the
+      // current state orientation
+      covariance.topLeftCorner<3, 3>() = rotation_matrix * covariance.topLeftCorner<3, 3>() * rotation_matrix.
+        transpose();
+
+      updateCovariance(covariance, odom_output, acceleration_output);
+      tf2::doTransform(odom_output.twist, odom_to_pub.twist, trans_child_frames);
+    }
+    catch (const std::exception& e)
+    {
+      ROS_WARN_STREAM_THROTTLE(5.0, "Could not lookup the " << params_.base_link_publishing_frame_id << "->" <<
+        params_.base_link_output_frame_id << " transform. Error: " << e.what() << " will not perform the transform");
+
+      odom_to_pub = odom_output;
+    }
+  }
+  odom_pub_.publish(odom_to_pub);
+
+  geometry_msgs::AccelWithCovarianceStamped acceleration_to_pub = acceleration_output;
+  acceleration_to_pub.header.frame_id = params_.base_link_publishing_frame_id;
+  if (params_.base_link_output_frame_id != params_.base_link_publishing_frame_id)
+  {
+    try
+    {
+      const auto trans_child_frames = tf_buffer_->lookupTransform(params_.base_link_publishing_frame_id,
+                                                                  odom_output.child_frame_id, odom_output.header.stamp,
+                                                                  params_.tf_timeout);
+
+      tf2::doTransform(acceleration_output, acceleration_to_pub, trans_child_frames);
+    }
+    catch (const std::exception& e)
+    {
+      ROS_WARN_STREAM_THROTTLE(5.0, "Could not lookup the " << params_.base_link_publishing_frame_id << "->" <<
+        params_.base_link_output_frame_id << " transform. Error: " << e.what() << " will not perform the transform");
+
+      acceleration_to_pub = acceleration_output;
+    }
+  }
+  acceleration_pub_.publish(acceleration_to_pub);
 
   // Publish a tf if enabled and there is a different (practically said new) time
   // Checking the time is important since otherwise at ROS 1 Noetic an internal warning messages spams the log (which
@@ -689,6 +664,120 @@ void Odometry3DPublisher::publishTimerCallback(const ros::TimerEvent& event)
     tf_broadcaster_.sendTransform(trans);
     last_tf_broadcast_time_ = trans.header.stamp;
   }
+}
+
+fuse_core::Matrix15d Odometry3DPublisher::convertCovariance(const nav_msgs::Odometry& odom,
+                                    const geometry_msgs::AccelWithCovarianceStamped& acceleration) const
+{
+    fuse_core::Matrix15d covariance;
+
+    // position
+    for (size_t row_i = 0; row_i < 3; ++row_i)
+    {
+      for (size_t col_i = 0; col_i < 3; ++col_i)
+      {
+        covariance(row_i, col_i) = odom.pose.covariance[col_i * 6 + row_i];
+      }
+    }
+
+    // orientation
+    for (size_t row_i = 3; row_i < 6; ++row_i)
+    {
+      for (size_t col_i = 3; col_i < 6; ++col_i)
+      {
+        covariance(row_i, col_i) = odom.pose.covariance[col_i * 6 + row_i];
+      }
+    }
+
+    // linear velocity
+    size_t covariance_matrix_offset = 6;
+    for (size_t row_i = 0; row_i < 3; ++row_i)
+    {
+      for (size_t col_i = 0; col_i < 3; ++col_i)
+      {
+        covariance(covariance_matrix_offset + row_i, covariance_matrix_offset + col_i) =
+          odom.twist.covariance[col_i * 6 + row_i];
+      }
+    }
+
+    // angular velocity
+    covariance_matrix_offset = 6;
+    for (size_t row_i = 3; row_i < 6; ++row_i)
+    {
+      for (size_t col_i = 3; col_i < 6; ++col_i)
+      {
+        covariance(covariance_matrix_offset + row_i, covariance_matrix_offset + col_i) =
+          odom.twist.covariance[col_i * 6 + row_i];
+      }
+    }
+
+    // linear acceleration
+    covariance_matrix_offset = 12;
+    for (size_t row_i = 0; row_i < 3; ++row_i)
+    {
+      for (size_t col_i = 0; col_i < 3; ++col_i)
+      {
+        covariance(covariance_matrix_offset + row_i, covariance_matrix_offset + col_i) =
+          acceleration.accel.covariance[col_i * 6 + row_i];
+      }
+    }
+
+    return covariance;
+}
+
+void Odometry3DPublisher::updateCovariance(const fuse_core::Matrix15d& covariance, nav_msgs::Odometry& odom,
+                      geometry_msgs::AccelWithCovarianceStamped& acceleration) const
+{
+    // position
+    for (size_t row_i = 0; row_i < 3; ++row_i)
+    {
+      for (size_t col_i = 0; col_i < 3; ++col_i)
+      {
+        odom.pose.covariance[col_i * 6 + row_i] = covariance(row_i, col_i);
+      }
+    }
+
+    // orientation
+    for (size_t row_i = 3; row_i < 6; ++row_i)
+    {
+      for (size_t col_i = 3; col_i < 6; ++col_i)
+      {
+        odom.pose.covariance[col_i * 6 + row_i] = covariance(row_i, col_i);
+      }
+    }
+
+    // linear velocity
+    size_t covariance_matrix_offset = 6;
+    for (size_t row_i = 0; row_i < 3; ++row_i)
+    {
+      for (size_t col_i = 0; col_i < 3; ++col_i)
+      {
+        odom.twist.covariance[col_i * 6 + row_i] =
+          covariance(covariance_matrix_offset + row_i, covariance_matrix_offset + col_i);
+      }
+    }
+
+    // angular velocity
+    covariance_matrix_offset = 6;
+    for (size_t row_i = 3; row_i < 6; ++row_i)
+    {
+      for (size_t col_i = 3; col_i < 6; ++col_i)
+      {
+        odom.twist.covariance[col_i * 6 + row_i] =
+          covariance(covariance_matrix_offset + row_i, covariance_matrix_offset + col_i);
+      }
+    }
+
+    // linear acceleration
+    covariance_matrix_offset = 12;
+    for (size_t row_i = 0; row_i < 3; ++row_i)
+    {
+      for (size_t col_i = 0; col_i < 3; ++col_i)
+      {
+        acceleration.accel.covariance[col_i * 6 + row_i] =
+          covariance(covariance_matrix_offset + row_i, covariance_matrix_offset + col_i);
+      }
+    }
 }
 
 }  // namespace fuse_models
