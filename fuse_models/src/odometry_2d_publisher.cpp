@@ -448,10 +448,13 @@ void Odometry2DPublisher::publishTimerCallback(const ros::TimerEvent& event)
 
       // Rotate the process noise covariance with the yaw angle of the current state orientation
       const auto rotation_matrix = Eigen::Rotation2Dd(pose.yaw()).toRotationMatrix();
-      // Apply only to x and y position as the other state variables are already along the
-      // current state orientation
-      covariance.topLeftCorner<2, 2>() = rotation_matrix * covariance.topLeftCorner<2, 2>() * rotation_matrix.
-        transpose();
+
+      // Rotate each part of the covariance separately (as it is done also for a pose with covariance)
+      // rotation is only one dimensional therefore skip those parts of the covariance blocks
+      covariance.block<2, 2>(0, 0) = rotation_matrix * covariance.block<2, 2>(0, 0) * rotation_matrix.transpose();
+      covariance.block<2, 2>(3, 3) = rotation_matrix * covariance.block<2, 2>(3, 3) * rotation_matrix.transpose();
+      covariance.block<2, 2>(6, 6) = rotation_matrix * covariance.block<2, 2>(6, 6) * rotation_matrix.transpose();
+
 
       updateCovariance(covariance, odom_output, acceleration_output);
       tf2::doTransform(odom_output.twist, odom_to_pub.twist, trans_child_frames);

@@ -573,10 +573,12 @@ void Odometry3DPublisher::publishTimerCallback(const ros::TimerEvent& event)
         }
       }
 
-      // Apply only to x, y and z position as the other state variables are already along the
-      // current state orientation
-      covariance.topLeftCorner<3, 3>() = rotation_matrix * covariance.topLeftCorner<3, 3>() * rotation_matrix.
-        transpose();
+      // Rotate each part of the covariance separately (as it is done also for a pose with covariance)
+      covariance.block<3, 3>(0, 0) = rotation_matrix * covariance.block<3, 3>(0, 0) * rotation_matrix.transpose();
+      covariance.block<3, 3>(3, 3) = rotation_matrix * covariance.block<3, 3>(3, 3) * rotation_matrix.transpose();
+      covariance.block<3, 3>(6, 6) = rotation_matrix * covariance.block<3, 3>(6, 6) * rotation_matrix.transpose();
+      covariance.block<3, 3>(9, 9) = rotation_matrix * covariance.block<3, 3>(9, 9) * rotation_matrix.transpose();
+      covariance.block<3, 3>(12, 12) = rotation_matrix * covariance.block<3, 3>(12, 12) * rotation_matrix.transpose();
 
       updateCovariance(covariance, odom_output, acceleration_output);
       tf2::doTransform(odom_output.twist, odom_to_pub.twist, trans_child_frames);
