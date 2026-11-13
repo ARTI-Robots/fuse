@@ -186,6 +186,7 @@ protected:
   TransactionCallback transaction_callback_;  //!< The function to be executed every time a Transaction is "published"
 
   bool active_;
+  bool auto_enabled_;
   ros::ServiceServer enabled_service_server_;
   std::thread start_stop_thread_;
   std::mutex start_stop_mutex_;

@@ -92,7 +92,8 @@ void AsyncSensorModel::initialize(
 
   sensor_enabled_pub_ = private_node_handle_.advertise<std_msgs::Bool>("sensor_enabled", 3, true);
 
-  active_ = private_node_handle_.param<bool>("auto_enabled", true);
+  auto_enabled_ = private_node_handle_.param<bool>("auto_enabled", true);
+  active_ = auto_enabled_;
 
   // Call the derived onInit() function to perform implementation-specific initialization
   onInit();
@@ -117,8 +118,15 @@ void AsyncSensorModel::start()
 
   if (!active_)
   {
-    // the sensor should not be active so do not start the sensor
-    return;
+    if (auto_enabled_)
+    {
+      active_ = true;
+    }
+    else
+    {
+      // the sensor should not be active so do not start the sensor
+      return;
+    }
   }
 
   auto callback = boost::make_shared<CallbackWrapper<void>>(std::bind(&AsyncSensorModel::onStart, this));
