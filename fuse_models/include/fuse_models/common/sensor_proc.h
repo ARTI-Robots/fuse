@@ -78,6 +78,29 @@
 namespace tf2
 {
 
+/** \brief Apply a geometry_msgs TransformStamped to a geometry_msgs TwistWithCovariance type.
+* This function is a specialization of the doTransform template defined in tf2/convert.h.
+* \param t_in The twist to transform, as a timestamped TwistWithCovariance message.
+* \param t_out The transformed twist, as a timestamped TwistWithCovariance message.
+* \param transform The timestamped transform to apply, as a TransformStamped message.
+*/
+template <>
+inline
+void doTransform(const geometry_msgs::TwistWithCovariance& t_in, geometry_msgs::TwistWithCovariance& t_out, const geometry_msgs::TransformStamped& transform)  // NOLINT
+{
+  tf2::Vector3 vl;
+  fromMsg(t_in.twist.linear, vl);
+  tf2::Vector3 va;
+  fromMsg(t_in.twist.angular, va);
+
+  tf2::Transform t;
+  fromMsg(transform.transform, t);
+  t_out.twist.linear = tf2::toMsg(t.getBasis() * vl);
+  t_out.twist.angular = tf2::toMsg(t.getBasis() * va);
+
+  t_out.covariance = transformCovariance(t_in.covariance, t);
+}
+
 /** \brief Apply a geometry_msgs TransformStamped to a geometry_msgs TwistWithCovarianceStamped type.
 * This function is a specialization of the doTransform template defined in tf2/convert.h.
 * \param t_in The twist to transform, as a timestamped TwistWithCovarianceStamped message.
@@ -88,19 +111,9 @@ template <>
 inline
 void doTransform(const geometry_msgs::TwistWithCovarianceStamped& t_in, geometry_msgs::TwistWithCovarianceStamped& t_out, const geometry_msgs::TransformStamped& transform)  // NOLINT
 {
-  tf2::Vector3 vl;
-  fromMsg(t_in.twist.twist.linear, vl);
-  tf2::Vector3 va;
-  fromMsg(t_in.twist.twist.angular, va);
-
-  tf2::Transform t;
-  fromMsg(transform.transform, t);
-  t_out.twist.twist.linear = tf2::toMsg(t.getBasis() * vl);
-  t_out.twist.twist.angular = tf2::toMsg(t.getBasis() * va);
+  doTransform(t_in.twist, t_out.twist, transform);
   t_out.header.stamp = transform.header.stamp;
   t_out.header.frame_id = transform.header.frame_id;
-
-  t_out.twist.covariance = transformCovariance(t_in.twist.covariance, t);
 }
 
 /** \brief Apply a geometry_msgs TransformStamped to a geometry_msgs AccelWithCovarianceStamped type.

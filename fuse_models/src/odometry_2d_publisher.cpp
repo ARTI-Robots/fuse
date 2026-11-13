@@ -394,32 +394,7 @@ void Odometry2DPublisher::publishTimerCallback(const ros::TimerEvent& event)
     // or it failed
     if (latest_covariance_valid)
     {
-      fuse_core::Matrix8d covariance;
-      covariance(0, 0) = odom_output.pose.covariance[0];
-      covariance(0, 1) = odom_output.pose.covariance[1];
-      covariance(0, 2) = odom_output.pose.covariance[5];
-      covariance(1, 0) = odom_output.pose.covariance[6];
-      covariance(1, 1) = odom_output.pose.covariance[7];
-      covariance(1, 2) = odom_output.pose.covariance[11];
-      covariance(2, 0) = odom_output.pose.covariance[30];
-      covariance(2, 1) = odom_output.pose.covariance[31];
-      covariance(2, 2) = odom_output.pose.covariance[35];
-
-      covariance(3, 3) = odom_output.twist.covariance[0];
-      covariance(3, 4) = odom_output.twist.covariance[1];
-      covariance(3, 5) = odom_output.twist.covariance[5];
-      covariance(4, 3) = odom_output.twist.covariance[6];
-      covariance(4, 4) = odom_output.twist.covariance[7];
-      covariance(4, 5) = odom_output.twist.covariance[11];
-      covariance(5, 3) = odom_output.twist.covariance[30];
-      covariance(5, 4) = odom_output.twist.covariance[31];
-      covariance(5, 5) = odom_output.twist.covariance[35];
-
-      covariance(6, 6) = acceleration_output.accel.covariance[0];
-      covariance(6, 7) = acceleration_output.accel.covariance[1];
-      covariance(7, 6) = acceleration_output.accel.covariance[6];
-      covariance(7, 7) = acceleration_output.accel.covariance[7];
-
+      fuse_core::Matrix8d covariance = convertCovariance(odom_output, acceleration_output);
       // TODO(efernandez) for now we set to zero the out-of-diagonal blocks with the correlations between pose, twist
       // and acceleration, but we could cache them in another attribute when we retrieve the covariance from the ceres
       // problem
@@ -439,35 +414,82 @@ void Odometry2DPublisher::publishTimerCallback(const ros::TimerEvent& event)
 
       covariance.noalias() += dt * process_noise_covariance;
 
-      odom_output.pose.covariance[0] = covariance(0, 0);
-      odom_output.pose.covariance[1] = covariance(0, 1);
-      odom_output.pose.covariance[5] = covariance(0, 2);
-      odom_output.pose.covariance[6] = covariance(1, 0);
-      odom_output.pose.covariance[7] = covariance(1, 1);
-      odom_output.pose.covariance[11] = covariance(1, 2);
-      odom_output.pose.covariance[30] = covariance(2, 0);
-      odom_output.pose.covariance[31] = covariance(2, 1);
-      odom_output.pose.covariance[35] = covariance(2, 2);
-
-      odom_output.twist.covariance[0] = covariance(3, 3);
-      odom_output.twist.covariance[1] = covariance(3, 4);
-      odom_output.twist.covariance[5] = covariance(3, 5);
-      odom_output.twist.covariance[6] = covariance(4, 3);
-      odom_output.twist.covariance[7] = covariance(4, 4);
-      odom_output.twist.covariance[11] = covariance(4, 5);
-      odom_output.twist.covariance[30] = covariance(5, 3);
-      odom_output.twist.covariance[31] = covariance(5, 4);
-      odom_output.twist.covariance[35] = covariance(5, 5);
-
-      acceleration_output.accel.covariance[0] = covariance(6, 6);
-      acceleration_output.accel.covariance[1] = covariance(6, 7);
-      acceleration_output.accel.covariance[6] = covariance(7, 6);
-      acceleration_output.accel.covariance[7] = covariance(7, 7);
+      updateCovariance(covariance, odom_output, acceleration_output);
     }
   }
 
-  odom_pub_.publish(odom_output);
-  acceleration_pub_.publish(acceleration_output);
+  nav_msgs::Odometry odom_to_pub = odom_output;
+  odom_to_pub.child_frame_id = params_.base_link_publishing_frame_id;
+  if (params_.base_link_output_frame_id != params_.base_link_publishing_frame_id)
+  {
+    try
+    {
+      const auto trans_child_frames = tf_buffer_->lookupTransform(odom_output.child_frame_id,
+                                                                  params_.base_link_publishing_frame_id,
+                                                                  odom_output.header.stamp, params_.tf_timeout);
+
+      geometry_msgs::TransformStamped odom_trans;
+      odom_trans.header.stamp = odom_output.header.stamp;
+      odom_trans.header.frame_id = odom_output.header.frame_id;
+      odom_trans.child_frame_id = odom_output.child_frame_id;
+      odom_trans.transform.translation.x = odom_output.pose.pose.position.x;
+      odom_trans.transform.translation.y = odom_output.pose.pose.position.y;
+      odom_trans.transform.translation.z = odom_output.pose.pose.position.z;
+      odom_trans.transform.rotation = tf2::toMsg(pose.getRotation());
+
+      geometry_msgs::TransformStamped transformed_odom_trans;
+      tf2::doTransform(trans_child_frames, transformed_odom_trans, odom_trans);
+
+      odom_to_pub.pose.pose.position.x = transformed_odom_trans.transform.translation.x;
+      odom_to_pub.pose.pose.position.y = transformed_odom_trans.transform.translation.y;
+      odom_to_pub.pose.pose.position.z = transformed_odom_trans.transform.translation.z;
+
+      fuse_core::Matrix8d covariance = convertCovariance(odom_output, acceleration_output);
+
+      // Rotate the process noise covariance with the yaw angle of the current state orientation
+      const auto rotation_matrix = Eigen::Rotation2Dd(pose.yaw()).toRotationMatrix();
+
+      // Rotate each part of the covariance separately (as it is done also for a pose with covariance)
+      // rotation is only one dimensional therefore skip those parts of the covariance blocks
+      covariance.block<2, 2>(0, 0) = rotation_matrix * covariance.block<2, 2>(0, 0) * rotation_matrix.transpose();
+      covariance.block<2, 2>(3, 3) = rotation_matrix * covariance.block<2, 2>(3, 3) * rotation_matrix.transpose();
+      covariance.block<2, 2>(6, 6) = rotation_matrix * covariance.block<2, 2>(6, 6) * rotation_matrix.transpose();
+
+
+      updateCovariance(covariance, odom_output, acceleration_output);
+      tf2::doTransform(odom_output.twist, odom_to_pub.twist, trans_child_frames);
+    }
+    catch (const std::exception& e)
+    {
+      ROS_WARN_STREAM_THROTTLE(5.0, "Could not lookup the " << params_.base_link_publishing_frame_id << "->" <<
+        params_.base_link_output_frame_id << " transform. Error: " << e.what() << " will not perform the transform");
+
+      odom_to_pub = odom_output;
+    }
+  }
+  odom_pub_.publish(odom_to_pub);
+
+  geometry_msgs::AccelWithCovarianceStamped acceleration_to_pub = acceleration_output;
+  acceleration_to_pub.header.frame_id = params_.base_link_publishing_frame_id;
+  if (params_.base_link_output_frame_id != params_.base_link_publishing_frame_id)
+  {
+    try
+    {
+      const auto trans_child_frames = tf_buffer_->lookupTransform(params_.base_link_publishing_frame_id,
+                                                                  odom_output.child_frame_id, odom_output.header.stamp,
+                                                                  params_.tf_timeout);
+
+      tf2::doTransform(acceleration_output, acceleration_to_pub, trans_child_frames);
+    }
+    catch (const std::exception& e)
+    {
+      ROS_WARN_STREAM_THROTTLE(5.0, "Could not lookup the " << params_.base_link_publishing_frame_id << "->" <<
+        params_.base_link_output_frame_id << " transform. Error: " << e.what() << " will not perform the transform");
+
+      acceleration_to_pub = acceleration_output;
+    }
+  }
+  acceleration_pub_.publish(acceleration_to_pub);
 
   // Publish a tf if enabled and there is a different (practically said new) time
   // Checking the time is important since otherwise at ROS 1 Noetic an internal warning messages spams the log (which
@@ -524,5 +546,69 @@ void Odometry2DPublisher::publishTimerCallback(const ros::TimerEvent& event)
     last_tf_broadcast_time_ = trans.header.stamp;
   }
 }
+
+fuse_core::Matrix8d Odometry2DPublisher::convertCovariance(const nav_msgs::Odometry& odom,
+                                                           const geometry_msgs::AccelWithCovarianceStamped&
+                                                           acceleration) const
+{
+  fuse_core::Matrix8d covariance;
+  covariance(0, 0) = odom.pose.covariance[0];
+  covariance(0, 1) = odom.pose.covariance[1];
+  covariance(0, 2) = odom.pose.covariance[5];
+  covariance(1, 0) = odom.pose.covariance[6];
+  covariance(1, 1) = odom.pose.covariance[7];
+  covariance(1, 2) = odom.pose.covariance[11];
+  covariance(2, 0) = odom.pose.covariance[30];
+  covariance(2, 1) = odom.pose.covariance[31];
+  covariance(2, 2) = odom.pose.covariance[35];
+
+  covariance(3, 3) = odom.twist.covariance[0];
+  covariance(3, 4) = odom.twist.covariance[1];
+  covariance(3, 5) = odom.twist.covariance[5];
+  covariance(4, 3) = odom.twist.covariance[6];
+  covariance(4, 4) = odom.twist.covariance[7];
+  covariance(4, 5) = odom.twist.covariance[11];
+  covariance(5, 3) = odom.twist.covariance[30];
+  covariance(5, 4) = odom.twist.covariance[31];
+  covariance(5, 5) = odom.twist.covariance[35];
+
+  covariance(6, 6) = acceleration.accel.covariance[0];
+  covariance(6, 7) = acceleration.accel.covariance[1];
+  covariance(7, 6) = acceleration.accel.covariance[6];
+  covariance(7, 7) = acceleration.accel.covariance[7];
+
+  return covariance;
+}
+
+void Odometry2DPublisher::updateCovariance(const fuse_core::Matrix8d& covariance, nav_msgs::Odometry& odom,
+                                           geometry_msgs::AccelWithCovarianceStamped& acceleration) const
+{
+  odom.pose.covariance[0] = covariance(0, 0);
+  odom.pose.covariance[1] = covariance(0, 1);
+  odom.pose.covariance[5] = covariance(0, 2);
+  odom.pose.covariance[6] = covariance(1, 0);
+  odom.pose.covariance[7] = covariance(1, 1);
+  odom.pose.covariance[11] = covariance(1, 2);
+  odom.pose.covariance[30] = covariance(2, 0);
+  odom.pose.covariance[31] = covariance(2, 1);
+  odom.pose.covariance[35] = covariance(2, 2);
+
+  odom.twist.covariance[0] = covariance(3, 3);
+  odom.twist.covariance[1] = covariance(3, 4);
+  odom.twist.covariance[5] = covariance(3, 5);
+  odom.twist.covariance[6] = covariance(4, 3);
+  odom.twist.covariance[7] = covariance(4, 4);
+  odom.twist.covariance[11] = covariance(4, 5);
+  odom.twist.covariance[30] = covariance(5, 3);
+  odom.twist.covariance[31] = covariance(5, 4);
+  odom.twist.covariance[35] = covariance(5, 5);
+
+  acceleration.accel.covariance[0] = covariance(6, 6);
+  acceleration.accel.covariance[1] = covariance(6, 7);
+  acceleration.accel.covariance[6] = covariance(7, 6);
+  acceleration.accel.covariance[7] = covariance(7, 7);
+}
+
+
 
 }  // namespace fuse_models
