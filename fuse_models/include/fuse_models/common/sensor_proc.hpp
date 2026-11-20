@@ -622,6 +622,12 @@ inline bool processDifferentialPoseWithCovariance(std::string const& source, fus
     return false;
   }
 
+  // Check that the first pose timestamp is earlier than the second pose timestamp
+  if (rclcpp::Time(pose1.header.stamp) >= rclcpp::Time(pose2.header.stamp))
+  {
+    return false;
+  }
+
   // Convert the poses into tf2_2d transforms
   tf2_2d::Transform pose1_2d;
   tf2::fromMsg(pose1.pose.pose, pose1_2d);
@@ -941,6 +947,17 @@ inline bool processDifferentialPose3DWithCovariance(std::string const& source, f
                                                     std::vector<size_t> const& orientation_indices, bool const validate,
                                                     fuse_core::Transaction& transaction)
 {
+  if (position_indices.empty() && orientation_indices.empty())
+  {
+    return false;
+  }
+
+  // Check that the first pose timestamp is earlier than the second pose timestamp
+  if (rclcpp::Time(pose1.header.stamp) >= rclcpp::Time(pose2.header.stamp))
+  {
+    return false;
+  }
+
   // Create the pose variables
   auto position1 = fuse_variables::Position3DStamped::make_shared(pose1.header.stamp, device_id);
   auto orientation1 = fuse_variables::Orientation3DStamped::make_shared(pose1.header.stamp, device_id);
@@ -1191,6 +1208,12 @@ inline bool processDifferentialPoseWithTwistCovariance(std::string const& source
     return false;
   }
 
+  // Check that the first pose timestamp is earlier than the second pose timestamp
+  if (rclcpp::Time(pose1.header.stamp) >= rclcpp::Time(pose2.header.stamp))
+  {
+    return false;
+  }
+
   // Convert the poses into tf2_2d transforms
   tf2_2d::Transform pose1_2d;
   tf2::fromMsg(pose1.pose.pose, pose1_2d);
@@ -1360,6 +1383,12 @@ inline bool processDifferentialPose3DWithTwistCovariance(std::string const& sour
                                                          bool const validate, fuse_core::Transaction& transaction)
 {
   if (position_indices.empty() && orientation_indices.empty())
+  {
+    return false;
+  }
+
+  // Check that the first pose timestamp is earlier than the second pose timestamp
+  if (rclcpp::Time(pose1.header.stamp) >= rclcpp::Time(pose2.header.stamp))
   {
     return false;
   }
