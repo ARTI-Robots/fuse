@@ -136,7 +136,7 @@ TEST(AsyncSensorModel, StartAndStop)
   MySensor sensor;
   std::string name ="my_sensor";
   ros::NodeHandle private_node_handle = ros::NodeHandle("~/" + name);
-  private_node_handle.deleteParam("auto_enabled");
+  private_node_handle.deleteParam("auto_enable");
 
   sensor.initialize("my_sensor", &transactionCallback);
 
@@ -157,7 +157,7 @@ TEST(AsyncSensorModel, EnableAndDisableService)
   MySensor sensor;
   std::string name ="my_sensor";
   ros::NodeHandle private_node_handle = ros::NodeHandle("~/" + name);
-  private_node_handle.deleteParam("auto_enabled");
+  private_node_handle.deleteParam("auto_enable");
 
   sensor.initialize("my_sensor", &transactionCallback);
 
@@ -214,13 +214,13 @@ TEST(AsyncSensorModel, EnableAndDisableService)
   EXPECT_EQ(sensor.stop_count_, 1);
 }
 
-TEST(AsyncSensorModel, DisableAutoEnabled)
+TEST(AsyncSensorModel, DisableAutoEnable)
 {
   MySensor sensor;
   std::string name ="my_sensor";
 
   ros::NodeHandle private_node_handle = ros::NodeHandle("~/" + name);
-  private_node_handle.setParam("auto_enabled", false);
+  private_node_handle.setParam("auto_enable", false);
 
   sensor.initialize("my_sensor", &transactionCallback);
   ros::spinOnce();
@@ -232,7 +232,7 @@ TEST(AsyncSensorModel, DisableAutoEnabled)
   EXPECT_EQ(sensor.start_count_, 0);
   EXPECT_EQ(sensor.stop_count_, 0);
 
-  private_node_handle.deleteParam("auto_enabled");
+  private_node_handle.deleteParam("auto_enable");
 }
 
 int main(int argc, char** argv)

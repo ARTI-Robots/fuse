@@ -185,8 +185,9 @@ protected:
   ros::AsyncSpinner spinner_;  //!< A single/multi-threaded spinner assigned to the local callback queue
   TransactionCallback transaction_callback_;  //!< The function to be executed every time a Transaction is "published"
 
-  bool active_;
-  bool auto_enabled_;
+  bool internal_active_;
+  bool external_active_;
+  bool running_;
   ros::ServiceServer enabled_service_server_;
   std::thread start_stop_thread_;
   std::mutex start_stop_mutex_;
@@ -262,6 +263,24 @@ protected:
   void startStopThreadLoop();
 
   void publishSensorsEnabled();
+
+  /**
+   * @brief Starts the sensor model's internal ROS callback processing.
+   *
+   * Initializes the internal execution resources used by the asynchronous sensor model and begins servicing callbacks
+   * associated with its private callback queue. This method is intended for use by the framework to transition the
+   * sensor model into an active state after initialization has completed.
+   */
+  void internalStart();
+
+  /**
+   * @brief Stops the internal asynchronous processing for the sensor model.
+   *
+   * Shuts down the resources managed by the base class that are used to service the model's private callback queue.
+   * This is intended to be called as part of the sensor model lifecycle when the plugin is being stopped or destroyed,
+   * ensuring callbacks are no longer processed before teardown continues.
+   */
+  void internalStop();
 };
 
 }  // namespace fuse_core
